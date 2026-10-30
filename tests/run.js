@@ -1,8 +1,9 @@
-// Builds the macro tests, then compiles each program in `tests/dom` for the browser and runs it in
-// a page made with jsdom. A program passes if it finishes without printing `FAIL`.
+// Builds the macro tests, checks where errors in holes are reported, then compiles each program in
+// `tests/dom` for the browser and runs it in a page made with jsdom. A program passes if it finishes
+// without printing `FAIL`.
 
 import { spawnSync } from "node:child_process";
-import { mkdirSync, readdirSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -21,6 +22,23 @@ if (build.status !== 0) {
   process.exit(1);
 }
 console.log("ok   macro tests");
+
+// Each error must point at the code in the hole, rather than at the whole element.
+const errorsFile = join(root, "tests", "errors", "Holes.lean");
+const expectedErrors = ["badAttr", "badChild", "42", "42", "nope"];
+const lines = readFileSync(errorsFile, "utf8").split("\n");
+const errors = run("lake", ["env", "lean", "--json", errorsFile]).stdout.trim().split("\n");
+const actualErrors = errors.map((line) => {
+  const { pos, endPos } = JSON.parse(line);
+  return pos.line === endPos.line
+    ? lines[pos.line - 1].slice(pos.column, endPos.column)
+    : `${pos.line}:${pos.column}-${endPos.line}:${endPos.column}`;
+});
+if (JSON.stringify(actualErrors) !== JSON.stringify(expectedErrors)) {
+  console.log(`FAIL error positions\nexpected ${expectedErrors}\ngot ${actualErrors}`);
+  process.exit(1);
+}
+console.log("ok   error positions");
 
 const only = process.argv[2];
 let failures = 0;

@@ -178,16 +178,18 @@ def checkAttr (tag : String) (ref : Syntax) (name : String) : CompileM Unit := d
 /-- Adds the hole for the attribute `name` with the value `value`. -/
 def attrHole (tag : String) (ref : Syntax) (path : Array Nat) (name : String) (value : Term) :
     CompileM Unit := do
-  let attr ← if name == "use" then
-      `(Lithe.Attr.use $value)
-    else if name.startsWith "on" && name.length > 2 then
-      checkAttr tag ref name
-      let event := Syntax.mkStrLit (name.drop 2).toString
-      `(Lithe.Attr.on $event (Lithe.ToHandler.toHandler $value))
-    else
-      checkAttr tag ref name
-      `(Lithe.Attr.value $(Syntax.mkStrLit name) (Lithe.ToAttrValue.toAttrValue $value))
-  let hole ← `(Lithe.Hole.attr $attr)
+  -- Type class failures are reported at the code that the macro generates, not at `value`.
+  let hole ← withRef value do
+    let attr ← if name == "use" then
+        `(Lithe.Attr.use $value)
+      else if name.startsWith "on" && name.length > 2 then
+        checkAttr tag ref name
+        let event := Syntax.mkStrLit (name.drop 2).toString
+        `(Lithe.Attr.on $event (Lithe.ToHandler.toHandler $value))
+      else
+        checkAttr tag ref name
+        `(Lithe.Attr.value $(Syntax.mkStrLit name) (Lithe.ToAttrValue.toAttrValue $value))
+    `(Lithe.Hole.attr $attr)
   modify fun st => { st with attrHoles := st.attrHoles.push (hole, path) }
 
 /-- Compiles an attribute of the element `tag` at `path`. -/
@@ -288,7 +290,8 @@ partial def compileChild (child : Syntax) (path : Array Nat) (parent : String)
       Macro.throwErrorAt child
         s!"`{parent}` can't have a child hole, as its content is plain text"
     let value : Term := ⟨child[1]⟩
-    let hole ← `(Lithe.Hole.child (Lithe.ToChild.toChild $value))
+    -- Type class failures are reported at the code that the macro generates, not at `value`.
+    let hole ← withRef value `(Lithe.Hole.child (Lithe.ToChild.toChild $value))
     modify fun st => { st with childHoles := st.childHoles.push (hole, path) }
     emit "<!>"
     return true
