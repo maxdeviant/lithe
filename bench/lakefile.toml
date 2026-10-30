@@ -1,0 +1,5 @@
+name = "lithe-bench"
+
+[[require]]
+name = "lithe"
+path = ".."

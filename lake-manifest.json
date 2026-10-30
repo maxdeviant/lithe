@@ -1,0 +1,16 @@
+{"version": "1.3.0",
+ "packagesDir": ".lake/packages",
+ "packages":
+ [{"url": "https://github.com/maxdeviant/leanscript",
+   "type": "git",
+   "subDir": null,
+   "scope": "",
+   "rev": "349543d62c2ff94b47bf3678bf579c0203d3289f",
+   "name": "leanscript",
+   "manifestFile": "lake-manifest.json",
+   "inputRev": "v0.1.0",
+   "inherited": false,
+   "configFile": "lakefile.toml"}],
+ "name": "lithe",
+ "lakeDir": ".lake",
+ "fixedToolchain": false}

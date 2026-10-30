@@ -1,0 +1,9 @@
+name = "todo"
+
+[[require]]
+name = "lithe"
+path = "../.."
+
+[[lean_lib]]
+name = "Todo"
+globs = ["Todo.+"]
