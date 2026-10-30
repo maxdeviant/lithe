@@ -198,6 +198,16 @@ importers:
         specifier: ^8.3.5
         version: 8.3.5
 
+  examples/stopwatch:
+    dependencies:
+      '@leanscript/vite-plugin':
+        specifier: 0.1.0
+        version: 0.1.0(vite@8.3.5)
+    devDependencies:
+      vite:
+        specifier: ^8.3.5
+        version: 8.3.5
+
   examples/todo:
     dependencies:
       '@leanscript/vite-plugin':

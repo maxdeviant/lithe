@@ -82,6 +82,10 @@ opaque setSlot (el : @& JsValue) (slot : @& Nat) : BaseIO Unit
 opaque addEventListener (target : @& JsValue) (type : @& String) (listener : @& JsValue)
     (capture : Bool) : BaseIO Unit
 
+@[extern js inline "(#1.removeEventListener(#2.toString(), #3), 0)"]
+opaque removeEventListener (target : @& JsValue) (type : @& String) (listener : @& JsValue) :
+    BaseIO Unit
+
 @[extern js inline "#1.target"]
 opaque eventTarget (e : @& JsValue) : BaseIO JsValue
 
@@ -96,6 +100,9 @@ opaque eventChecked (e : @& JsValue) : BaseIO Bool
 
 @[extern js inline "$rt.mkString(String(#1.key ?? ''))"]
 opaque eventKey (e : @& JsValue) : BaseIO String
+
+@[extern js inline "#1.timeStamp ?? 0"]
+opaque eventTimeStamp (e : @& JsValue) : BaseIO Float
 
 @[extern js inline "(#1.preventDefault(), 0)"]
 opaque preventDefault (e : @& JsValue) : BaseIO Unit
@@ -121,6 +128,16 @@ opaque ElementHandle.toElement (h : @& ElementHandle) : Js.Dom.HtmlElement
 def Action.focus : Action := fun h => do
   h.toElement.focus
   return pure ()
+
+/-- Returns the snapshot of the DOM event `e`. -/
+def Event.ofJs (e : JsValue) : IO Event := do
+  return {
+    type := ← Raw.eventType e
+    value := ← Raw.eventValue e
+    checked := ← Raw.eventChecked e
+    key := ← Raw.eventKey e
+    timeStamp := ← Raw.eventTimeStamp e
+  }
 
 /-- What is on an element, which mirrors `Attr`. -/
 inductive MountedAttr (Msg : Type) where
@@ -235,13 +252,8 @@ ancestors below `root`, or stopping at the target if `targetOnly`.
 -/
 def handleEvent (handlers : IO.Ref (HandlerTable Msg)) (dispatch : Msg → IO Unit) (root : JsValue)
     (targetOnly : Bool) (e : JsValue) : IO Unit := do
-  let type ← Raw.eventType e
-  let event : Event := {
-    type
-    value := ← Raw.eventValue e
-    checked := ← Raw.eventChecked e
-    key := ← Raw.eventKey e
-  }
+  let event ← Event.ofJs e
+  let type := event.type
   let mut node ← Raw.eventTarget e
   while !node.isNull && !node.isUndefined && !(JsValue.strictEq node root) do
     let slot ← Raw.getSlot node

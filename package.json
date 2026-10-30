@@ -5,7 +5,7 @@
   "scripts": {
     "generate": "node scripts/generate-html-data.js",
     "test": "node tests/run.js",
-    "test:browser": "node tests/browser/todo.js",
+    "test:browser": "node tests/browser/todo.js && node tests/browser/stopwatch.js",
     "bench": "node bench/run.js"
   },
   "devDependencies": {

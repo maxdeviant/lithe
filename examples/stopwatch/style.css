@@ -1,0 +1,22 @@
+body {
+  font-family: system-ui, sans-serif;
+  margin: 3rem auto;
+  max-width: 24rem;
+  text-align: center;
+}
+
+#time {
+  font-size: 3rem;
+  font-variant-numeric: tabular-nums;
+}
+
+kbd {
+  font-size: 0.8em;
+  opacity: 0.6;
+}
+
+#laps {
+  font-variant-numeric: tabular-nums;
+  list-style: none;
+  padding: 0;
+}

@@ -2,7 +2,7 @@
 
 import { JSDOM } from "jsdom";
 
-const { window } = new JSDOM(`<!doctype html><body></body>`);
+const { window } = new JSDOM(`<!doctype html><body></body>`, { pretendToBeVisual: true });
 for (const name of [
   "document",
   "DOMTokenList",
@@ -16,6 +16,9 @@ for (const name of [
   "MutationObserver",
   "Node",
   "Text",
+  "cancelAnimationFrame",
+  "requestAnimationFrame",
+  "window",
 ]) {
   globalThis[name] = window[name];
 }

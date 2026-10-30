@@ -14,6 +14,7 @@ Message types are unconstrained, so `Html (Model → Model)` works too. `App.sim
 | `Lithe.Syntax` | The markup macro. Runs only at compile time. |
 | `Lithe.Dom` | Mounting, patching, and event delegation. |
 | `Lithe.Cmd` | Effects as data. |
+| `Lithe.Subscription` | Outside events as data. |
 | `Lithe.App` | The update and render loop. |
 
 ## Constraints from LeanScript
@@ -76,6 +77,20 @@ Known rough edges, which can't be fixed in the macro:
 
 **Actions** run once, after their element is in the page, and don't rerun if the action changes between renders. Their syntax is `use={action}` rather than Svelte's `use:action`, as this allows any expression without special parsing.
 
+## Subscriptions
+
+An app's optional `subscriptions` function returns the outside events to listen to in a given state, such as a timer that only exists while a stopwatch runs. It's named `Subscription` because `Sub` is ambiguous with Lean's class of that name after `open Lithe`.
+
+**Identity comes from keys.** Functions can't be compared, so each source has a string key, and it keeps running for as long as its key is subscribed. The built-in sources make theirs from their parameters, as in `every:1000`, so changing the interval restarts the timer. Sources with the same key are told apart by position, so two `every 1000` both run.
+
+**Sources sync after each render**, so a batch of messages leads to one sync. Stopping comes first, so that a replacement never overlaps what it replaces.
+
+**Handlers are the same `Handler` as in markup**, and go through a table cell that is updated on each sync. The JS callback only captures the cell, so starting a source once is enough however often its handler changes, and the handler always sees current values. A source's events are `Event` snapshots, as the handler has to stay pure.
+
+**Handlers should capture IDs, not the model.** The previous handler is alive while `update` runs, so a captured model is copied on each update. With a 200,000-element array, updates took about 0.03 ms with a running subscription whose handler captures nothing, and 2.1 ms with one that captures the model. The first number shows that a running subscription doesn't itself stop updates in place.
+
+A source that fails to start logs an error and counts as running, so that it isn't retried on every render. Apps have no way to unmount, so sources run until the state stops asking for them.
+
 ## Performance
 
 The rule is that patching stays in Lean unless benchmarking shows both of these:
@@ -109,6 +124,6 @@ Ideas to try if the numbers become a problem, in rough order of expected value:
 
 ## Not in the first version
 
-Server rendering and hydration, `component` syntax, scoped CSS, transitions, subscriptions, SVG, and hot reload that preserves state. A patcher proof is also out, with randomized tests in `tests/dom/Random.lean` standing in for it.
+Server rendering and hydration, `component` syntax, scoped CSS, transitions, SVG, and hot reload that preserves state. A patcher proof is also out, with randomized tests in `tests/dom/Random.lean` standing in for it.
 
 SVG needs skeletons parsed with the right namespace, and a way to create elements in that namespace for `Html.elem`.

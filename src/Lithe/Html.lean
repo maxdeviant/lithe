@@ -19,6 +19,8 @@ structure Event where
   checked : Bool := false
   /-- The event's `key`, or empty if it has none. -/
   key : String := ""
+  /-- When the event happened, in milliseconds since the page started loading. -/
+  timeStamp : Float := 0
   deriving Inhabited, Repr
 
 /-- How to respond to an event. -/

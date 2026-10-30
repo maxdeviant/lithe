@@ -1,6 +1,7 @@
 import Js
 import Lithe.Cmd
 import Lithe.Dom
+import Lithe.Subscription
 
 /-!
 Running an app: the loop that sends messages to `update`, and shows the result of `view`.
@@ -18,12 +19,24 @@ structure App (Model Msg : Type) where
   update : Msg → Model → Model × Cmd Msg
   /-- Returns the page for a state. -/
   view : Model → Html Msg
+  /-- Returns the outside events to listen to in a state. -/
+  subscriptions : Model → Subscription Msg := fun _ => .none
 
 /-- Returns an app without effects, whose messages are the state changes themselves. -/
-def App.simple (init : Model) (view : Model → Html (Model → Model)) : App Model (Model → Model) where
+def App.simple (init : Model) (view : Model → Html (Model → Model))
+    (subscriptions : Model → Subscription (Model → Model) := fun _ => .none) :
+    App Model (Model → Model) where
   init := (init, .none)
   update f m := (f m, .none)
   view := view
+  subscriptions := subscriptions
+
+/-- A source of outside events that an app has started. -/
+structure App.RunningSource (Msg : Type) where
+  /-- The latest handler, which the source's events go to. -/
+  handler : IO.Ref (Handler Msg)
+  /-- Stops the source. -/
+  stop : IO Unit
 
 /-- The state of a running app. -/
 structure App.Running (Model Msg : Type) where
@@ -35,6 +48,8 @@ structure App.Running (Model Msg : Type) where
   scheduled : IO.Ref Bool
   /-- The JS function that renders, which is created once. -/
   renderJs : IO.Ref JsValue
+  /-- The sources that are running, by ID. -/
+  sources : IO.Ref (Std.HashMap String (RunningSource Msg))
 
 @[extern js inline "(queueMicrotask(#1), 0)"]
 private opaque queueMicrotask (f : @& JsValue) : BaseIO Unit
@@ -75,6 +90,49 @@ partial def dispatch (r : Running Model Msg) (msg : Msg) : IO Unit := do
 
 end
 
+/--
+Starts `source`. A source that fails to start still counts as running, so that it isn't retried on
+every render.
+-/
+def startSource (r : Running Model Msg) (source : Subscription.Source Msg) :
+    IO (RunningSource Msg) := do
+  let handler ← IO.mkRef source.handler
+  let send (e : Event) : IO Bool := do
+    let h ← handler.get
+    if let some msg := h.run e then
+      dispatch r msg
+    return h.preventDefault
+  try
+    return { handler, stop := ← source.start send }
+  catch e =>
+    IO.eprintln s!"Lithe: error while starting the subscription {source.key}: {e}"
+    return { handler, stop := pure () }
+
+/--
+Starts and stops sources to match the current state, and points those that keep running at their
+latest handlers. Sources with the same key are told apart by their position among them.
+-/
+def syncSources (r : Running Model Msg) : IO Unit := do
+  let mut counts : Std.HashMap String Nat := {}
+  let mut wanted : Array (String × Subscription.Source Msg) := #[]
+  for source in (r.app.subscriptions (← r.model.get)).sources do
+    let n := counts.getD source.key 0
+    counts := counts.insert source.key (n + 1)
+    wanted := wanted.push (s!"{source.key}\x00{n}", source)
+  for (id, running) in ← r.sources.get do
+    unless wanted.any (·.1 == id) do
+      r.sources.modify (·.erase id)
+      try
+        running.stop
+      catch e =>
+        IO.eprintln s!"Lithe: error while stopping a subscription: {e}"
+  for (id, source) in wanted do
+    if let some running := (← r.sources.get)[id]? then
+      running.handler.set source.handler
+    else
+      let running ← r.startSource source
+      r.sources.modify (·.insert id running)
+
 end App.Running
 
 /-- Starts `app`, which takes over the contents of `root`. -/
@@ -86,6 +144,7 @@ def App.mount (app : App Model Msg) (root : Js.Dom.Element) : IO Unit := do
     generations := ← IO.mkRef {}
     scheduled := ← IO.mkRef false
     renderJs := ← IO.mkRef .undefined
+    sources := ← IO.mkRef {}
   }
   let rt ← Runtime.new root.val (App.Running.dispatch r)
   let mounted ← IO.mkRef (Mounted.empty : Mounted Msg)
@@ -95,6 +154,7 @@ def App.mount (app : App Model Msg) (root : Js.Dom.Element) : IO Unit := do
     let old ← mounted.swap .empty
     mounted.set (← rt.patch root.val .null old html)
     rt.runActions
+    r.syncSources
   r.renderJs.set (← toJs render)
   Raw.clearChildren root.val
   render

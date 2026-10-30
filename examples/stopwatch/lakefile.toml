@@ -1,0 +1,9 @@
+name = "stopwatch"
+
+[[require]]
+name = "lithe"
+path = "../.."
+
+[[lean_lib]]
+name = "Stopwatch"
+globs = ["Stopwatch.+"]
