@@ -9,6 +9,7 @@ rev = "v0.1.0"
 
 [[lean_lib]]
 name = "Lithe"
+srcDir = "src"
 
 # Macro tests, and helpers for the programs in `tests/dom`.
 [[lean_lib]]

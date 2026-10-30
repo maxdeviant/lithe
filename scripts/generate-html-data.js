@@ -1,4 +1,4 @@
-// Writes `Lithe/Syntax/HtmlData.lean` from web standards data, for the macro to check markup against.
+// Writes `src/Lithe/Syntax/HtmlData.lean` from web standards data, for the macro to check markup against.
 
 import { writeFileSync } from "node:fs";
 import { htmlElementAttributes } from "html-element-attributes";
@@ -49,4 +49,4 @@ ${elementAttributes}
 end Lithe.HtmlData
 `;
 
-writeFileSync(new URL("../Lithe/Syntax/HtmlData.lean", import.meta.url), output);
+writeFileSync(new URL("../src/Lithe/Syntax/HtmlData.lean", import.meta.url), output);
