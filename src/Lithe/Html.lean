@@ -21,6 +21,16 @@ structure Event where
   key : String := ""
   /-- When the event happened, in milliseconds since the page started loading. -/
   timeStamp : Float := 0
+  /-- Whether the Control key was down. -/
+  ctrlKey : Bool := false
+  /-- Whether the Meta key, which is Command on a Mac, was down. -/
+  metaKey : Bool := false
+  /-- Whether the Shift key was down. -/
+  shiftKey : Bool := false
+  /-- Whether the Alt key, which is Option on a Mac, was down. -/
+  altKey : Bool := false
+  /-- The tag name of the event's target in uppercase, or empty if it isn't an element. -/
+  targetTag : String := ""
   deriving Inhabited, Repr
 
 /-- How to respond to an event. -/
@@ -177,9 +187,10 @@ class ToChild (α : Type) (Msg : Type) where
 
 /--
 Lets elements in a hole take their message type from the enclosing markup, which is not yet known
-when instance resolution first runs.
+when instance resolution first runs. It has a high priority so that this happens before
+`ToHandler Msg Msg` guesses that a handler such as `String → Msg` is itself the message type.
 -/
-@[default_instance] instance : ToChild (Html Msg) Msg := ⟨id⟩
+@[default_instance high] instance : ToChild (Html Msg) Msg := ⟨id⟩
 instance : ToChild String Msg := ⟨.text⟩
 instance : ToChild Nat Msg := ⟨(.text <| toString ·)⟩
 instance : ToChild Int Msg := ⟨(.text <| toString ·)⟩

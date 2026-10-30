@@ -1,0 +1,239 @@
+:root {
+  color-scheme: light dark;
+  --surface: light-dark(#f4f4f5, #27272a);
+  --card: light-dark(#fff, #3f3f46);
+  --border: light-dark(#d4d4d8, #52525b);
+  --accent: #2563eb;
+}
+
+body {
+  font-family: system-ui, sans-serif;
+  margin: 0;
+}
+
+main {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-height: 100vh;
+  padding: 1rem;
+}
+
+h1 {
+  font-size: 1.25rem;
+  margin: 0;
+}
+
+.toolbar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+#search {
+  flex: 0 1 16rem;
+}
+
+.filters {
+  display: flex;
+  flex: 1;
+  gap: 0.25rem;
+}
+
+#problem {
+  background: light-dark(#fee2e2, #7f1d1d);
+  border-radius: 0.25rem;
+  margin: 0;
+  padding: 0.5rem;
+}
+
+#board {
+  align-items: flex-start;
+  display: flex;
+  flex: 1;
+  gap: 1rem;
+  overflow-x: auto;
+}
+
+.column {
+  background: var(--surface);
+  border-bottom: 3px solid transparent;
+  border-radius: 0.5rem;
+  display: flex;
+  flex: 0 0 18rem;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem;
+}
+
+.column.drop-end {
+  border-bottom-color: var(--accent);
+}
+
+.column > header {
+  align-items: center;
+  display: flex;
+  gap: 0.25rem;
+}
+
+.column-name {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 0.25rem;
+  flex: 1;
+  font-weight: 600;
+  min-width: 0;
+}
+
+.column-name:hover,
+.column-name:focus {
+  border-color: var(--border);
+}
+
+.count {
+  font-size: 0.8em;
+  opacity: 0.7;
+  white-space: nowrap;
+}
+
+.column button:not(.add-card, .new-card button) {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 0.25rem;
+}
+
+.column button:disabled {
+  cursor: default;
+  opacity: 0.3;
+}
+
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0;
+  min-height: 1rem;
+  padding: 0;
+}
+
+.card {
+  background: var(--card);
+  border-radius: 0.25rem;
+  /* A shadow marks the drop position, as changing the layout mid-drag makes the target jump. */
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.2);
+  cursor: grab;
+  padding: 0.5rem;
+}
+
+.card.dragging {
+  opacity: 0.4;
+}
+
+.card.drop-before {
+  box-shadow: 0 -3px 0 var(--accent);
+}
+
+.card a {
+  color: inherit;
+  display: block;
+  text-decoration: none;
+}
+
+.card a:hover {
+  text-decoration: underline;
+}
+
+.card-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0;
+}
+
+.label {
+  border: 1px solid transparent;
+  border-radius: 1rem;
+  color: #000;
+  font-size: 0.75rem;
+  padding: 0 0.5rem;
+}
+
+.label.bug {
+  background: #fca5a5;
+}
+
+.label.feature {
+  background: #93c5fd;
+}
+
+.label.chore {
+  background: #d4d4d8;
+}
+
+button.label {
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+button.label[aria-pressed="true"] {
+  border-color: currentColor;
+  opacity: 1;
+}
+
+.new-card {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.new-card input {
+  box-sizing: border-box;
+  width: 100%;
+}
+
+#add-column {
+  flex: none;
+}
+
+#editor {
+  border: none;
+  border-radius: 0.5rem;
+  width: min(28rem, 90vw);
+}
+
+#editor form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+#editor label:not(fieldset label) {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+#editor fieldset label {
+  margin-right: 0.75rem;
+}
+
+#editor footer {
+  display: flex;
+  gap: 0.25rem;
+  justify-content: flex-end;
+}
+
+#editor-delete {
+  margin-right: auto;
+}

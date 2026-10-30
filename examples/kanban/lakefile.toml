@@ -1,0 +1,9 @@
+name = "kanban"
+
+[[require]]
+name = "lithe"
+path = "../.."
+
+[[lean_lib]]
+name = "Kanban"
+globs = ["Kanban.+"]

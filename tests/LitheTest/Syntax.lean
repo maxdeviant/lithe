@@ -227,6 +227,23 @@ example : Html HandlerMsg := <form onsubmit={preventDefault (stopPropagation onE
 example (x : Option String) : Html Unit := <p>{x}</p>
 example (xs : Array String) : Html Unit := <p>{xs[0]?}</p>
 example (x : Option String) : Html Unit := <div>{x.map fun s => <p>{s}</p>}</div>
+
+/-! A handler that takes the event's value, in an element nested in a lambda. -/
+section
+private inductive SetMsg where
+  | set (value : String)
+
+example (xs : Array String) : Html SetMsg :=
+  <div>{Html.forEach xs id fun x => <input value={x} oninput={SetMsg.set} />}</div>
+end
+
+/-! `select` and `textarea` have a `value` property, which only holes can set. -/
+example (s : String) : Html Unit := <textarea value={s}></textarea>
+example (s : String) : Html Unit := <select value={s}><option value="a">A</option></select>
+
+/-- error: `textarea` has no attribute `value` -/
+#guard_msgs in
+example : Html Unit := <textarea value="a"></textarea>
 example (x : Option String) (f : String → Html Unit) : Html Unit := <div>{x.map f}</div>
 example (xs : Array String) : Html Unit :=
   <div>{(xs[0]? : Option String).map fun s => <p>{s}</p>}</div>

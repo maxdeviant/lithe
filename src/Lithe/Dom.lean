@@ -104,6 +104,12 @@ opaque eventKey (e : @& JsValue) : BaseIO String
 @[extern js inline "#1.timeStamp ?? 0"]
 opaque eventTimeStamp (e : @& JsValue) : BaseIO Float
 
+@[extern js inline "#1[#2.toString()] === true ? 1 : 0"]
+opaque eventFlag (e : @& JsValue) (name : @& String) : BaseIO Bool
+
+@[extern js inline "$rt.mkString(String(#1.target?.tagName ?? ''))"]
+opaque eventTargetTag (e : @& JsValue) : BaseIO String
+
 @[extern js inline "(#1.preventDefault(), 0)"]
 opaque preventDefault (e : @& JsValue) : BaseIO Unit
 
@@ -137,6 +143,11 @@ def Event.ofJs (e : JsValue) : IO Event := do
     checked := ← Raw.eventChecked e
     key := ← Raw.eventKey e
     timeStamp := ← Raw.eventTimeStamp e
+    ctrlKey := ← Raw.eventFlag e "ctrlKey"
+    metaKey := ← Raw.eventFlag e "metaKey"
+    shiftKey := ← Raw.eventFlag e "shiftKey"
+    altKey := ← Raw.eventFlag e "altKey"
+    targetTag := ← Raw.eventTargetTag e
   }
 
 /-- What is on an element, which mirrors `Attr`. -/
@@ -191,10 +202,11 @@ end Mounted
 /-- The events that don't bubble, which the root sees during the capture phase instead. -/
 def captureEvents : Std.HashSet String :=
   Std.HashSet.ofList
-    ["abort", "blur", "canplay", "canplaythrough", "durationchange", "emptied", "ended", "error",
-      "focus", "load", "loadeddata", "loadedmetadata", "loadstart", "mouseenter", "mouseleave",
-      "pause", "play", "playing", "pointerenter", "pointerleave", "progress", "ratechange", "scroll",
-      "seeked", "seeking", "stalled", "suspend", "timeupdate", "toggle", "volumechange", "waiting"]
+    ["abort", "beforetoggle", "blur", "cancel", "canplay", "canplaythrough", "close", "cuechange",
+      "durationchange", "emptied", "ended", "error", "focus", "invalid", "load", "loadeddata",
+      "loadedmetadata", "loadstart", "mouseenter", "mouseleave", "pause", "play", "playing",
+      "pointerenter", "pointerleave", "progress", "ratechange", "scroll", "scrollend", "seeked",
+      "seeking", "stalled", "suspend", "timeupdate", "toggle", "volumechange", "waiting"]
 
 /-- The properties to write instead of attributes, as attributes only set their initial state. -/
 def isLiveProperty (name : String) : Bool :=

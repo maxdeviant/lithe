@@ -45,6 +45,8 @@ Elements compile to a `Template`, which holds static HTML and the path to each h
 
 **Comments are Lean's.** Among children, a comment goes in a hole, as in `{/- note -/}`, and between attributes it needs no hole. They nest, so commenting out markup always works, and they never reach the page. The text on either side of one is joined before whitespace is handled, as if the comment weren't there, because it becomes a single DOM node. HTML comments are an error that suggests this form. A bare `-- note` among children stays text, as text may contain anything that looks like Lean.
 
+**`value` on `select` and `textarea` only works in a hole.** They have the property but not the attribute, so a static `value` is an error rather than being silently ignored.
+
 **`class` has no directive.** Svelte now advises against `class:`, so `class` takes a value like any other attribute: `class={#["row", cls "done" t.done]}`.
 
 ### Parsing traps
@@ -55,7 +57,7 @@ These were all found by testing, and each has a test in `tests/LitheTest/Syntax.
 - The tokens that end tags (`>`, `/>`, and `}` in a child hole) don't consume whitespace. Otherwise text like ` -- hello` is treated as a Lean comment, and the space in `{a} {b}` is lost.
 - Text is parsed outside of the `markupChild` category, as a category parser can't start at whitespace.
 - The syntax is `scoped`, so `</` is only a token in files that `open Lithe`.
-- `ToChild (Html Msg) Msg` and `ToHandler Msg Msg` are default instances. Otherwise elements nested in a lambda in a hole get stuck on an unknown `Msg`.
+- `ToChild (Html Msg) Msg` and `ToHandler Msg Msg` are default instances. Otherwise elements nested in a lambda in a hole get stuck on an unknown `Msg`. The first has a higher priority, so that the message type comes from the enclosing markup before `oninput={Msg.set}` can make `String → Msg` the message type.
 
 Known rough edges, which can't be fixed in the macro:
 
@@ -77,6 +79,8 @@ Known rough edges, which can't be fixed in the macro:
 **Rendering is batched** in a microtask, so several messages in one turn cause one render. An event whose handler sends no message doesn't render, so a controlled input can briefly disagree with the model in that case.
 
 **Events** walk from the target through `parentNode` to the root, reading a slot number stored on each element. Events that don't bubble use a capture-phase listener and go to their target only. That includes `mouseenter` and `mouseleave`, as the browser sends the root's capture listener one event per element.
+
+**Focus follows from keys.** There's no effect that focuses an element, as it wouldn't know whether the element has been rendered yet. To focus an input again after a change, make it the only item of a keyed list whose key changes, so that a new element runs `Action.focus`.
 
 **Actions** run once, after their element is in the page, and don't rerun if the action changes between renders. Their syntax is `use={action}` rather than Svelte's `use:action`, as this allows any expression without special parsing.
 

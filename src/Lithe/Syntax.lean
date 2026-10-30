@@ -239,7 +239,9 @@ def attrHole (tag : String) (ref : Syntax) (path : Array Nat) (name : String) (v
         let event := Syntax.mkStrLit (name.drop 2).toString
         `(Lithe.Attr.on $event (Lithe.ToHandler.toHandler $value))
       else
-        checkAttr tag ref name
+        -- These have a `value` property but no such attribute, and holes set live properties.
+        unless name == "value" && (tag == "select" || tag == "textarea") do
+          checkAttr tag ref name
         `(Lithe.Attr.value $(Syntax.mkStrLit name) (Lithe.ToAttrValue.toAttrValue $value))
     `(Lithe.Hole.attr $attr)
   modify fun st => { st with attrHoles := st.attrHoles.push (hole, path) }

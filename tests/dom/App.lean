@@ -33,6 +33,7 @@ def view (m : Model) : Html Up :=
       <button id="stop" onclick={stopPropagation (logged "stopped")}>b</button>
     </section>
     <form id="form" onsubmit={preventDefault (logged "submit")}></form>
+    <dialog id="dialog" onclose={logged "close"}></dialog>
     <input id="focus" onfocus={logged "focus"} onkeydown={fun (e : Lithe.Event) => if e.key == "Enter" then some (logged "enter") else none} />
     <p id="draft">{m.draft}</p>
     <p id="log">{" ".intercalate m.log.toList}</p>
@@ -88,8 +89,11 @@ def run : Async Unit := do
   let notPrevented ← (← find root "#form").dispatchEvent submit
   check "`preventDefault` cancels the event" !notPrevented
 
+  fire (← find root "#dialog") "close" (bubbles := false)
   fire (← find root "#focus") "focus" (bubbles := false)
   settle
+  check "a dialog's close event, which doesn't bubble, arrives"
+    (((← (← find root "#log").textContent).splitOn " ").contains "close")
   check "events that don't bubble reach their target"
     (((← (← find root "#log").textContent).splitOn " ").contains "focus")
   let press (key : String) : IO Unit := do
