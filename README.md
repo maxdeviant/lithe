@@ -34,7 +34,7 @@ Markup is checked at compile time, and compiles to static HTML with dynamic hole
 
 ## Development
 
-With [elan](https://github.com/leanprover/elan) and [pnpm](https://pnpm.io) installed:
+With [elan](https://github.com/leanprover/elan) and [pnpm](https://pnpm.io) installed, or in the Nix dev shell (`nix develop`, or `direnv allow`):
 
 ```sh
 pnpm install
