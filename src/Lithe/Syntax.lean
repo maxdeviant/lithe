@@ -100,6 +100,20 @@ def markupEnd : Parser := { fn := whitespace }
 @[combinator_parenthesizer markupEnd] def markupEnd.parenthesizer : Parenthesizer := pure ()
 @[combinator_formatter markupEnd] def markupEnd.formatter : Formatter := pure ()
 
+/-- Fails unless there is a line break before what comes next. -/
+def afterLinebreak : Parser := checkLinebreakBefore "expected a line break"
+@[combinator_parenthesizer afterLinebreak] def afterLinebreak.parenthesizer : Parenthesizer :=
+  pure ()
+@[combinator_formatter afterLinebreak] def afterLinebreak.formatter : Formatter := pure ()
+
+/-- Fails with an explanation of what happens to an element that follows an expression. -/
+def markupAfterExpr : Parser := {
+  fn := fun _ s => s.mkUnexpectedError
+    "markup here is read as `<` comparing the line above with this tag, so end the line above with `;`" }
+@[combinator_parenthesizer markupAfterExpr] def markupAfterExpr.parenthesizer : Parenthesizer :=
+  pure ()
+@[combinator_formatter markupAfterExpr] def markupAfterExpr.formatter : Formatter := pure ()
+
 declare_syntax_cat markupAttr
 declare_syntax_cat markupElement
 declare_syntax_cat markupChild
@@ -118,6 +132,12 @@ scoped syntax (name := childComment) "{" markupRBrace : markupChild
 scoped syntax (name := childElement) markupElement : markupChild
 -- Below `arg` precedence, so that `a < b` is never read as applying `a` to an element.
 scoped syntax:lead (name := markup) markupElement markupEnd : term
+
+-- This never succeeds. An element after a `let` is otherwise a comparison, whose error doesn't
+-- help, and the parser that gets the furthest wins. Comparisons are unaffected, as the tag is
+-- atomic, so this only gets further than one if it finds a whole tag.
+scoped syntax:50 term:51 afterLinebreak
+  atomic("<" markupName markupAttr* (markupGt <|> markupSelfClose)) markupAfterExpr : term
 
 /-- The attributes that aren't in the standards data but that every element accepts. -/
 def ariaAttributes : List String := ["role"]

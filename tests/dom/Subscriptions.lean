@@ -62,7 +62,7 @@ def subscriptions (m : Model) : Subscription Msg :=
   .batch #[
     .batch (m.keys.map (recorded · m.label)),
     if m.timer then .every 2 Msg.tick else .none,
-    if m.window then .onWindow "keydown" (preventDefault onKey : Handler Msg) else .none,
+    if m.window then .onWindow "keydown" (preventDefault onKey) else .none,
     if m.frames then .animationFrame Msg.frame else .none,
     if m.broken then
       .source "broken" Msg.tick fun _ => throw (.userError "boom")

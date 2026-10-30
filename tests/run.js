@@ -23,13 +23,17 @@ if (build.status !== 0) {
 }
 console.log("ok   macro tests");
 
+// Returns the messages from compiling `file`.
+function messagesOf(file) {
+  const { stdout } = run("lake", ["env", "lean", "--json", file]);
+  return stdout.trim().split("\n").map((line) => JSON.parse(line));
+}
+
 // Each error must point at the code in the hole, rather than at the whole element.
 const errorsFile = join(root, "tests", "errors", "Holes.lean");
 const expectedErrors = ["badAttr", "badChild", "42", "42", "nope"];
 const lines = readFileSync(errorsFile, "utf8").split("\n");
-const errors = run("lake", ["env", "lean", "--json", errorsFile]).stdout.trim().split("\n");
-const actualErrors = errors.map((line) => {
-  const { pos, endPos } = JSON.parse(line);
+const actualErrors = messagesOf(errorsFile).map(({ pos, endPos }) => {
   return pos.line === endPos.line
     ? lines[pos.line - 1].slice(pos.column, endPos.column)
     : `${pos.line}:${pos.column}-${endPos.line}:${endPos.column}`;
@@ -39,6 +43,19 @@ if (JSON.stringify(actualErrors) !== JSON.stringify(expectedErrors)) {
   process.exit(1);
 }
 console.log("ok   error positions");
+
+// `#guard_msgs` can't check these, as parse errors happen outside of the command it wraps.
+const parseErrors = messagesOf(join(root, "tests", "errors", "Parse.lean"))
+  .filter((m) => m.severity === "error")
+  .map((m) => `${m.pos.line}: ${m.data}`);
+const afterExpr =
+  "markup here is read as `<` comparing the line above with this tag, so end the line above with `;`";
+const expectedParseErrors = [`11: ${afterExpr}`, `15: ${afterExpr}`, "19: unterminated HTML comment"];
+if (JSON.stringify(parseErrors) !== JSON.stringify(expectedParseErrors)) {
+  console.log(`FAIL parse errors\nexpected ${expectedParseErrors}\ngot ${parseErrors}`);
+  process.exit(1);
+}
+console.log("ok   parse errors");
 
 const only = process.argv[2];
 let failures = 0;

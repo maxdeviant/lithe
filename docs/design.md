@@ -59,7 +59,8 @@ These were all found by testing, and each has a test in `tests/LitheTest/Syntax.
 
 Known rough edges, which can't be fixed in the macro:
 
-- An element after a `let` on the next line continues the expression, so `let x := y` followed by `<div>` parses as `y < div`. Use `;` or a helper function.
+- An element after a `let` on the next line continues the expression, so `let x := y` followed by `<div>` parses as `y < div`. Lean's parser for `<` can't be removed, so `;` is required, but a parser that only exists to fail explains this.
+- `{xs[0]?.map fun x => <p>{x}</p>}` fails, as the element type of `xs[0]?` isn't known soon enough. Annotate it, as in `(xs[0]? : Option String)`, or use `match`.
 - `fun s => fun m => ...` as a handler needs its type written out, so handlers that are state functions taking an argument work best as named functions.
 - A wrong handler type reports the type class failure, such as `OfNat Unit 42`.
 

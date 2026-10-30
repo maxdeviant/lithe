@@ -39,7 +39,7 @@ With [elan](https://github.com/leanprover/elan) and [pnpm](https://pnpm.io) inst
 ```sh
 pnpm install
 pnpm test          # The macro tests, and DOM tests in jsdom.
-pnpm test:browser  # The todo example in Chrome.
+pnpm test:browser  # The examples in Chrome, or the browser that `BROWSER` names.
 pnpm bench         # The benchmark in Chrome. Add `--profile` for a breakdown.
 ```
 

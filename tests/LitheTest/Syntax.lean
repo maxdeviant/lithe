@@ -192,3 +192,41 @@ example : Html Unit := <div><!-- note --></div>
 /-- error: HTML comments aren't supported, so write `{/- ... -/}` instead -/
 #guard_msgs in
 example : Html Unit := <div>a <!-- <p>{hidden}</p> --> b</div>
+
+-- Comparisons on several lines aren't mistaken for an element after an expression.
+example (a b : Nat) : Bool :=
+  a
+    < b
+
+/-! `preventDefault` and `stopPropagation` take anything that can respond to events. -/
+
+inductive HandlerMsg where
+  | add
+  | set (s : String)
+
+def onEvent (e : Event) : HandlerMsg := .set e.key
+
+example : Html HandlerMsg := <form onsubmit={preventDefault HandlerMsg.add}></form>
+example : Html HandlerMsg := <form onsubmit={preventDefault .add}></form>
+example : Html HandlerMsg := <form onsubmit={preventDefault (.set "a")}></form>
+example : Html HandlerMsg := <form onsubmit={preventDefault onEvent}></form>
+example : Html HandlerMsg := <form onsubmit={preventDefault HandlerMsg.set}></form>
+example : Html HandlerMsg := <form onsubmit={stopPropagation onEvent}></form>
+example : Html HandlerMsg := <form onsubmit={stopPropagation .add}></form>
+example : Html HandlerMsg := <form onsubmit={preventDefault (stopPropagation onEvent)}></form>
+
+/-- info: (true, true) -/
+#guard_msgs in
+#eval
+  let h : Handler HandlerMsg :=
+    ToHandler.toHandler (preventDefault (stopPropagation onEvent))
+  (h.preventDefault, h.stopPropagation)
+
+/-! Options in holes. -/
+
+example (x : Option String) : Html Unit := <p>{x}</p>
+example (xs : Array String) : Html Unit := <p>{xs[0]?}</p>
+example (x : Option String) : Html Unit := <div>{x.map fun s => <p>{s}</p>}</div>
+example (x : Option String) (f : String → Html Unit) : Html Unit := <div>{x.map f}</div>
+example (xs : Array String) : Html Unit :=
+  <div>{(xs[0]? : Option String).map fun s => <p>{s}</p>}</div>

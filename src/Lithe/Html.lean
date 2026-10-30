@@ -192,6 +192,15 @@ instance [ToChild α Msg] : ToChild (Option α) Msg where
     | some a => ToChild.toChild a
     | none => .empty
 
+/--
+Lets elements in an `Option` take their message type from the enclosing markup. It has a low
+priority so that an option whose element type isn't known yet, such as `xs[0]?`, gets to find out.
+-/
+@[default_instance low] instance : ToChild (Option (Html Msg)) Msg where
+  toChild
+    | some h => h
+    | none => .empty
+
 /-- Values that can be the value of an attribute in markup. -/
 class ToAttrValue (α : Type) where
   /-- Converts `a` to the value of an attribute. -/
@@ -235,12 +244,34 @@ instance : ToHandler (String → Msg) Msg := ⟨fun f => { run := fun e => some 
 /-- Sends the message for the `checked` state of the event's target. -/
 instance : ToHandler (Bool → Msg) Msg := ⟨fun f => { run := fun e => some (f e.checked) }⟩
 
-/-- Returns the handler for `a`, also canceling the event's default action. -/
-def preventDefault [ToHandler α Msg] (a : α) : Handler Msg :=
-  (ToHandler.toHandler a).withPreventDefault
+/-- A value that can respond to events, which also cancels the event's default action. -/
+structure PreventDefault (α : Type) where
+  /-- The value that responds to events. -/
+  value : α
 
-/-- Returns the handler for `a`, also stopping the event from reaching the element's ancestors. -/
-def stopPropagation [ToHandler α Msg] (a : α) : Handler Msg :=
-  (ToHandler.toHandler a).withStopPropagation
+/-- A value that can respond to events, which also stops the event from reaching ancestors. -/
+structure StopPropagation (α : Type) where
+  /-- The value that responds to events. -/
+  value : α
+
+/-- Returns `a`, also canceling the event's default action. -/
+def preventDefault (a : α) : PreventDefault α := ⟨a⟩
+
+/-- Returns `a`, also stopping the event from reaching the element's ancestors. -/
+def stopPropagation (a : α) : StopPropagation α := ⟨a⟩
+
+instance [ToHandler α Msg] : ToHandler (PreventDefault α) Msg :=
+  ⟨fun p => (ToHandler.toHandler p.value).withPreventDefault⟩
+
+instance [ToHandler α Msg] : ToHandler (StopPropagation α) Msg :=
+  ⟨fun p => (ToHandler.toHandler p.value).withStopPropagation⟩
+
+/-- Lets `preventDefault .add` take its type from the message type. -/
+@[default_instance] instance : ToHandler (PreventDefault Msg) Msg :=
+  ⟨fun p => (ToHandler.toHandler p.value).withPreventDefault⟩
+
+/-- Lets `stopPropagation .add` take its type from the message type. -/
+@[default_instance] instance : ToHandler (StopPropagation Msg) Msg :=
+  ⟨fun p => (ToHandler.toHandler p.value).withStopPropagation⟩
 
 end Lithe
