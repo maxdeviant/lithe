@@ -49,6 +49,36 @@ def rawTokenFn (kind : SyntaxNodeKind) (chars : List Char) : ParserFn := fun c s
   let s := chars.foldl (fun s ch => satisfyFn (· == ch) s!"expected '{ch}'" c s) s
   mkNodeToken kind startPos false c s
 
+/-- Returns whether the input has `chars` at `pos`. -/
+def inputHasAt (c : ParserContext) (pos : String.Pos.Raw) : List Char → Bool
+  | [] => true
+  | ch :: rest => !c.atEnd pos && c.get pos == ch && inputHasAt c (c.next pos) rest
+
+/-- An HTML comment, which is only parsed so that the macro can suggest what to write instead. -/
+def markupHtmlComment : Parser := {
+  fn := fun c s =>
+    let startPos := s.pos
+    if !inputHasAt c startPos ['<', '!', '-', '-'] then
+      s.mkError "expected an HTML comment"
+    else
+      let rec find (fuel : Nat) (pos : String.Pos.Raw) : Option String.Pos.Raw :=
+        match fuel with
+        | 0 => none
+        | fuel + 1 =>
+          if c.atEnd pos then
+            none
+          else if inputHasAt c pos ['-', '-', '>'] then
+            some (pos + "-->")
+          else
+            find fuel (c.next pos)
+      match find c.inputString.utf8ByteSize (startPos + "<!--") with
+      | some endPos => mkNodeToken `Lithe.markupHtmlComment startPos false c (s.setPos endPos)
+      -- Past the start, as otherwise the parser would try the next alternative, and report that.
+      | none => s.mkUnexpectedErrorAt "unterminated HTML comment" (c.next startPos) }
+@[combinator_parenthesizer markupHtmlComment] def markupHtmlComment.parenthesizer : Parenthesizer :=
+  pure ()
+@[combinator_formatter markupHtmlComment] def markupHtmlComment.formatter : Formatter := pure ()
+
 /-- The `>` that ends a tag. -/
 def markupGt : Parser := { fn := rawTokenFn `Lithe.markupGt ['>'] }
 @[combinator_parenthesizer markupGt] def markupGt.parenthesizer : Parenthesizer := pure ()
@@ -81,8 +111,10 @@ scoped syntax (name := attrShort) "{" ident "}" : markupAttr
 scoped syntax (name := elementSelfClosed) "<" markupName markupAttr* markupSelfClose : markupElement
 -- Text is parsed outside of the category, as a category parser can't start at whitespace.
 scoped syntax (name := elementOpen) "<" markupName markupAttr* markupGt
-  (markupText <|> markupChild)* "</" markupName markupGt : markupElement
+  (markupText <|> markupHtmlComment <|> markupChild)* "</" markupName markupGt : markupElement
 scoped syntax (name := childHole) "{" term markupRBrace : markupChild
+-- Lean's comments are whitespace, so a comment among children is a hole with nothing in it.
+scoped syntax (name := childComment) "{" markupRBrace : markupChild
 scoped syntax (name := childElement) markupElement : markupChild
 -- Below `arg` precedence, so that `a < b` is never read as applying `a` to an element.
 scoped syntax:lead (name := markup) markupElement markupEnd : term
@@ -245,6 +277,24 @@ def normalizeText (text : String) : String := Id.run do
     if i == lines.length - 1 then line else line.trimAsciiEnd.copy
   return " ".intercalate (trimmed.filter (!·.isEmpty))
 
+/--
+Removes comments from `children`, and joins the text around them, as it is one node to the HTML
+parser. Throws an error for an HTML comment.
+-/
+def removeComments (children : Array Syntax) : CompileM (Array Syntax) :=
+  children.foldlM (init := #[]) fun acc child => do
+    if child.isOfKind `Lithe.markupHtmlComment then
+      Macro.throwErrorAt child "HTML comments aren't supported, so write `{/- ... -/}` instead"
+    if child.isOfKind ``childComment then
+      return acc
+    match acc.back? with
+    | some prev =>
+      if prev.isOfKind `Lithe.markupText && child.isOfKind `Lithe.markupText then
+        let text := prev[0].getAtomVal ++ child[0].getAtomVal
+        return acc.pop.push (mkNode `Lithe.markupText #[mkAtomFrom prev text])
+      return acc.push child
+    | none => return acc.push child
+
 mutual
 
 /-- Compiles the element `el` at `path`, whose parent is the head of `ancestors`. -/
@@ -268,7 +318,7 @@ partial def compileElement (el : Syntax) (path : Array Nat) (ancestors : List St
   if newlineDroppingElements.contains tag then
     emit "\n"
   let mut index := 0
-  for child in el[4].getArgs do
+  for child in ← removeComments el[4].getArgs do
     if ← compileChild child (path.push index) tag (tag :: ancestors) then
       index := index + 1
   emit s!"</{tag}>"

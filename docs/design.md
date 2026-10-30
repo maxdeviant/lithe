@@ -43,6 +43,8 @@ Elements compile to a `Template`, which holds static HTML and the path to each h
 
 **Text is HTML**, so entities such as `&nbsp;` work. To write a literal brace, use a hole: `{"{"}`.
 
+**Comments are Lean's.** Among children, a comment goes in a hole, as in `{/- note -/}`, and between attributes it needs no hole. They nest, so commenting out markup always works, and they never reach the page. The text on either side of one is joined before whitespace is handled, as if the comment weren't there, because it becomes a single DOM node. HTML comments are an error that suggests this form. A bare `-- note` among children stays text, as text may contain anything that looks like Lean.
+
 **`class` has no directive.** Svelte now advises against `class:`, so `class` takes a value like any other attribute: `class={#["row", cls "done" t.done]}`.
 
 ### Parsing traps

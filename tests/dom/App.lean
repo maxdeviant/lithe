@@ -23,6 +23,7 @@ def setOn (b : Bool) : Up := fun m => { m with on := b }
 
 def view (m : Model) : Html Up :=
   <div id="app" class={#["app", cls "on" m.on]} data-count={m.count} title={if m.on then some "t" else none}>
+    <p id="commented">a{/- note -/}b<i>{/- note -/}c</i>{/- note -/}{m.count}</p>
     <button id="inc" onclick={(fun (m : Model) => { m with count := m.count + 1 })}>{m.count}</button>
     <input id="text" value={m.draft} oninput={setDraft} />
     <input id="box" type="checkbox" checked={m.on} onchange={setOn} />
@@ -48,6 +49,7 @@ def run : Async Unit := do
   checkEq "messages render in a batch, later" (← inc.textContent) "0"
   settle
   checkEq "text holes update" (← inc.textContent) "2"
+  checkEq "holes after comments update" (← (← find root "#commented").textContent) "abc2"
   checkEq "attribute holes update" (← (← find root "#app").getAttribute "data-count") (some "2")
   check "updates keep the same elements" (JsValue.strictEq (← find root "#inc").val inc.val)
 

@@ -134,3 +134,61 @@ example : Html Unit := <textarea>{"a"}</textarea>
 /-- error: `svg` can't be used in markup: SVG isn't supported yet -/
 #guard_msgs in
 example : Html Unit := <svg />
+
+/-- info: "<div><p>a</p></div>" -/
+#guard_msgs in
+#eval htmlOf (<div>{/- note -/}<p>a</p>{/- note -/}</div>)
+
+/-- info: "<div></div>" -/
+#guard_msgs in
+#eval htmlOf (<div>{/- outer /- inner -/ <p>{"hidden"}</p> -/}</div>)
+
+-- A line comment ends at the line break, so the brace has to be on the next line.
+/-- info: "<div></div>" -/
+#guard_msgs in
+#eval htmlOf (<div>{-- note
+}</div>)
+
+/-- info: "<div></div>" -/
+#guard_msgs in
+#eval htmlOf (<div>{}</div>)
+
+-- Text around a comment is one node, so what comes after it is at the same index as without one.
+/-- info: "<p>ab<!></p>" -/
+#guard_msgs in
+#eval htmlOf (<p>a{/- note -/}b{"c"}</p>)
+
+/-- info: #[#[1]] -/
+#guard_msgs in
+#eval pathsOf (<p>a{/- note -/}b{"c"}</p>)
+
+/-- info: #[#[1]] -/
+#guard_msgs in
+#eval pathsOf (<p>{/- note -/}a{/- note -/}{"c"}</p>)
+
+-- Whitespace is handled as if the comment weren't there.
+/-- info: "<p>a b</p>" -/
+#guard_msgs in
+#eval htmlOf (
+  <p>
+    a
+    {/- note -/}
+    b
+  </p>)
+
+/-- info: #[#[0], #[1]] -/
+#guard_msgs in
+#eval pathsOf (
+  <p>
+    {"a"}
+    {/- note -/}
+    {"b"}
+  </p>)
+
+/-- error: HTML comments aren't supported, so write `{/- ... -/}` instead -/
+#guard_msgs in
+example : Html Unit := <div><!-- note --></div>
+
+/-- error: HTML comments aren't supported, so write `{/- ... -/}` instead -/
+#guard_msgs in
+example : Html Unit := <div>a <!-- <p>{hidden}</p> --> b</div>
