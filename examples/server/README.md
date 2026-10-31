@@ -2,7 +2,7 @@
 
 A counter whose page comes from a native Lean server, and that LeanScript then makes interactive.
 
-- `Counter.lean` has the state and the page, and imports `Lithe.Core`, so both sides can use it.
+- `Counter.lean` has the state and the page, and is a module that imports `Lithe.Core`, so both sides can use it.
 - `Server.lean` is a native program, which uses `Html.render` to put the page in its response.
 - `App.lean` is the client, which `index.html` loads directly, and imports all of `Lithe`.
 
@@ -18,6 +18,8 @@ A counter whose page comes from a native Lean server, and that LeanScript then m
 @[extern c inline "lean_io_result_mk_ok(lean_box(0))" js inline "(#1.showModal(), 0)"]
 opaque showModal (dialog : @& ElementHandle) : BaseIO Unit
 ```
+
+**The native side is all modules**, starting from `Server.lean`, and that's what keeps the server small. Code that isn't a module initializes everything that its imports use at compile time, so importing the markup macro from one would link all of Lean's compiler into the server, which adds about 100 MB.
 
 ## Running
 

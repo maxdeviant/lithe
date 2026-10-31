@@ -1,3 +1,5 @@
+module
+
 import Lithe.Core
 
 open Lithe
@@ -40,7 +42,7 @@ unsafe def fakeHandleImpl : ElementHandle := unsafeCast ()
 
 @[implemented_by fakeHandleImpl] opaque fakeHandle : ElementHandle
 
-def main : IO UInt32 := do
+public def main : IO UInt32 := do
   let rendered ← check "rendering" (view 3).render
     ("<main class=\"a b\"><button>+</button><input value=\"3\">" ++
       "<svg viewBox=\"0 0 1 1\"><rect width=\"3\"></rect></svg>" ++

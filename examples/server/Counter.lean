@@ -1,8 +1,12 @@
-import Lithe.Core
+module
+
+public import Lithe.Core
 
 open Lithe
 
 /-! The state and the page, which the server and the client share, so this can't import `Lithe`. -/
+
+public section
 
 /-- The changes that the page can ask for. -/
 inductive Msg where

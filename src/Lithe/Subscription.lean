@@ -1,8 +1,12 @@
-import Lithe.Html
+module
+
+public import Lithe.Html
 
 /-!
 Subscriptions, which describe the outside events that an app listens to in a given state.
 -/
+
+@[expose] public section
 
 namespace Lithe
 

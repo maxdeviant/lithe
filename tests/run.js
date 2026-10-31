@@ -3,7 +3,7 @@
 // without printing `FAIL`.
 
 import { spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, readdirSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -62,6 +62,12 @@ console.log("ok   parse errors");
 const native = run("lake", ["exe", "lithe-native-test"]);
 if (native.status !== 0) {
   console.log(`FAIL native\n${native.stdout}${native.stderr}`);
+  process.exit(1);
+}
+// The compiler adds about 100 MB, and it only takes one import in the wrong place to link it in.
+const nativeSize = statSync(join(root, ".lake", "build", "bin", "lithe-native-test")).size;
+if (nativeSize > 20_000_000) {
+  console.log(`FAIL native size\nthe native program is ${nativeSize} bytes`);
   process.exit(1);
 }
 console.log("ok   native");

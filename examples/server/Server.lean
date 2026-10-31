@@ -1,3 +1,5 @@
+module
+
 import Counter
 import Std.Http
 
@@ -52,7 +54,7 @@ def serve (port : UInt16) (dist : System.FilePath) : Async Unit := do
   (← IO.getStdout).flush
   server.waitShutdown
 
-def main (args : List String) : IO Unit := do
+public def main (args : List String) : IO Unit := do
   let port := (args[0]?.bind String.toNat?).getD 3000
   let dist := args[1]?.getD "dist"
   (serve port.toUInt16 dist).block

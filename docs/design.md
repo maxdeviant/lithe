@@ -30,7 +30,7 @@ Lithe has two targets. `Lithe` is for LeanScript, and `Lithe.Core` is for code t
 
 **Subscriptions are split.** The type and `Subscription.source` are data, so they're in `Lithe.Core`, and a shared module can define `subscriptions` with sources of its own. The built-in sources call the browser, so a function that uses `Subscription.every` belongs on the client.
 
-**The markup macro makes native programs large.** A program using markup is about 100 MB and takes about 20 ms to start, compared with about 2 MB and 3 ms with `Lithe.Render` alone, as it links all of `Lean`. This doesn't apply to LeanScript, which only includes what's reachable.
+**Native programs should be modules, all the way from their root.** Each module gets a runtime initializer and a combined one that also covers what its imports use at compile time. A module's runtime initializer only calls those of its imports, but code that isn't a module calls the combined ones, which reach `initialize_Lean` through `Lithe.Syntax`, so the linker can't remove the compiler. A program that shows markup was 101 MB and took 21 ms to start like that, compared with 1.2 MB and 2.4 ms as modules. A program that isn't a module still works, and is only larger. This doesn't apply to LeanScript, which only includes what's reachable. As a module can only import modules, everything in `Lithe.Core` has to be one. `pnpm test` checks the size of its native program.
 
 ## Constraints from LeanScript
 

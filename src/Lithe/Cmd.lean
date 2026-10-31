@@ -1,8 +1,12 @@
-import Std.Async.Basic
+module
+
+public import Std.Async.Basic
 
 /-!
 Effects, which an app's `update` describes as data, and the app's runtime performs.
 -/
+
+@[expose] public section
 
 open Std.Async
 
