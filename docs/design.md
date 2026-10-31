@@ -92,6 +92,20 @@ Known rough edges, which can't be fixed in the macro:
 
 **Actions** run once, after their element is in the page, and don't rerun if the action changes between renders. Their syntax is `use={action}` rather than Svelte's `use:action`, as this allows any expression without special parsing.
 
+## Rendering to a string
+
+`Html.render` returns the HTML for a description, which parses to the same page as mounting it, as `tests/dom/Random.lean` and `tests/dom/Render.lean` check. It has no JS imports, so it also works in `#eval`. Hydration is a separate problem: the output has no markers for holes, so a client can only replace it.
+
+**The macro records where each hole goes**, as byte offsets in `Template.sites`. Working it out again from the HTML would take a second parser that has to agree with the first.
+
+**Escaping happens at the boundary.** Static HTML is what the author wrote and goes through as is, so `&nbsp;` works, while anything from a hole is escaped. Text in raw text elements such as `script` can't be escaped, so `</` becomes `<\/` there, and names that `Html.elem` got at run time are dropped if they could add markup, as the DOM would reject them too.
+
+**Live properties** become what sets their initial state: `value` and `checked` are attributes, `value` on `textarea` is its content, and `value` on `select` adds `selected` to the first matching `option`, found by scanning the rendered content. `indeterminate` has no form in HTML, so it's dropped. A `select` whose value matches no option has none selected when mounted, but HTML can't say that, so the browser selects the first.
+
+**Attributes can't be repeated in markup**, as `setAttribute` makes the last one win and the HTML parser keeps the first. `Html.elem` isn't checked.
+
+**Holes can still restructure the output.** A hole's content is added directly to the DOM when mounting, so `<p>{<div />}</p>` works, but the same HTML makes the parser close the `p`. The macro can't see this, as holes aren't checked against what's around them.
+
 ## Subscriptions
 
 An app's optional `subscriptions` function returns the outside events to listen to in a given state, such as a timer that only exists while a stopwatch runs. It's named `Subscription` because `Sub` is ambiguous with Lean's class of that name after `open Lithe`.
@@ -139,4 +153,4 @@ Ideas to try if the numbers become a problem, in rough order of expected value:
 
 ## Not in the first version
 
-Server rendering and hydration, `component` syntax, scoped CSS, transitions, MathML, and hot reload that preserves state. A patcher proof is also out, with randomized tests in `tests/dom/Random.lean` standing in for it.
+Server rendering beyond `Html.render`, hydration, `component` syntax, scoped CSS, transitions, MathML, and hot reload that preserves state. A patcher proof is also out, with randomized tests in `tests/dom/Random.lean` standing in for it.

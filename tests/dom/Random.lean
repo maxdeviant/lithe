@@ -75,6 +75,7 @@ def main : IO Unit := do
   let mut gen := mkStdGen 42
   let mut mounted : Mounted Nat := .empty
   let mut failures := 0
+  let mut renderFailures := 0
   let iterations := 1500
   for i in [0:iterations] do
     let (next, g) := (html 4).run gen
@@ -92,12 +93,19 @@ def main : IO Unit := do
       failures := failures + 1
       if failures ≤ 3 then
         IO.println s!"FAIL iteration {i}\n  expected: {expected} ({expectedHandlers} handlers)\n  actual:   {actual} ({actualHandlers} handlers)"
+    let mountedDom ← describeDom fresh.val
+    let renderedDom ← describeParsed next.render
+    if mountedDom != renderedDom then
+      renderFailures := renderFailures + 1
+      if renderFailures ≤ 3 then
+        IO.println s!"FAIL iteration {i}: rendering\n  mounted:  {mountedDom}\n  rendered: {renderedDom}\n  html:     {next.render}"
     freshRt.dispose freshMounted
     fresh.remove
     let remaining ← handlerCount freshRt
     if remaining != 0 then
       IO.println s!"FAIL iteration {i}: disposing left {remaining} handlers"
   checkEq s!"patching matches mounting in {iterations} random updates" failures 0
+  checkEq s!"rendering matches mounting for {iterations} random descriptions" renderFailures 0
   rt.unmount mounted
   checkEq "unmounting leaves no handlers" (← handlerCount rt) 0
   checkEq "unmounting leaves no nodes" (← innerHtml root) ""

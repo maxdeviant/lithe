@@ -212,14 +212,29 @@ and so it counts as SVG. Tags that are also HTML, such as `a`, are HTML here, as
 def isSvgFragment (tag : String) : Bool :=
   HtmlData.svgTagNames.contains tag && (tag == "image" || !HtmlData.tagNames.contains tag)
 
+/-- A hole for an attribute. -/
+structure AttrHole where
+  /-- The value of the hole. -/
+  term : Term
+  /-- The path to the element. -/
+  path : Array Nat
+  /-- The element's tag. -/
+  tag : String
+  /-- The attribute's name. -/
+  name : String
+  /-- The position of the `>` of the element's opening tag. -/
+  tagEnd : Nat := 0
+  /-- The position of the end of the element's content. -/
+  contentEnd : Nat := 0
+
 /-- The state of compiling markup. -/
 structure State where
   /-- The HTML so far. -/
   html : String := ""
-  /-- The holes for content, with their paths. -/
-  childHoles : Array (Term × Array Nat) := #[]
-  /-- The holes for attributes, with their paths. -/
-  attrHoles : Array (Term × Array Nat) := #[]
+  /-- The holes for content, with their paths and sites. -/
+  childHoles : Array (Term × Array Nat × Term) := #[]
+  /-- The holes for attributes. -/
+  attrHoles : Array AttrHole := #[]
 
 abbrev CompileM := StateT State MacroM
 
@@ -264,7 +279,7 @@ def attrHole (tag : String) (svg : Bool) (ref : Syntax) (path : Array Nat) (name
           checkAttr tag svg ref name
         `(Lithe.Attr.value $(Syntax.mkStrLit name) (Lithe.ToAttrValue.toAttrValue $value))
     `(Lithe.Hole.attr $attr)
-  modify fun st => { st with attrHoles := st.attrHoles.push (hole, path) }
+  modify fun st => { st with attrHoles := st.attrHoles.push { term := hole, path, tag, name } }
 
 /-- Compiles an attribute of the element `tag` at `path`. -/
 def compileAttr (tag : String) (svg : Bool) (path : Array Nat) (attr : Syntax) : CompileM Unit := do
@@ -301,10 +316,36 @@ def checkNesting (ref : Syntax) (tag : String) (ancestors : List String) : Compi
     unless allowed.contains tag do
       Macro.throwErrorAt ref
         s!"`{tag}` can't be a child of `{parent}`, as the HTML parser would move it"
-  if siblingGroups.any fun g => g.contains tag && g.contains parent then
+  -- An `optgroup` is where an `option` belongs, even though the reverse closes the `option`.
+  let isOptionInGroup := tag == "option" && parent == "optgroup"
+  if !isOptionInGroup && siblingGroups.any fun g => g.contains tag && g.contains parent then
     Macro.throwErrorAt ref s!"`{tag}` can't be a child of `{parent}`, as the HTML parser would close it"
   if rawTextElements.contains parent then
     Macro.throwErrorAt ref s!"`{parent}` can't have child elements, as its content is plain text"
+
+/-- Returns the name that the attribute `attr` sets. -/
+def attrName (attr : Syntax) : String :=
+  if attr.isOfKind ``attrShort then attr[1].getId.toString else nameText attr[0]
+
+/-- Throws an error if `attrs` sets something twice, which the DOM and the HTML parser resolve oppositely. -/
+def checkDuplicateAttrs (tag : String) (attrs : Array Syntax) : CompileM Unit := do
+  let mut seen : List String := []
+  for attr in attrs do
+    let name := attrName attr
+    if name != "use" then
+      if seen.contains name then
+        Macro.throwErrorAt attr s!"`{tag}` has the attribute `{name}` more than once"
+      seen := name :: seen
+
+/-- Records where the attribute holes from `first` to `last` are in the HTML. -/
+def setAttrExtent (first last tagEnd contentEnd : Nat) : CompileM Unit :=
+  modify fun st => { st with
+    attrHoles := st.attrHoles.mapIdx fun i h =>
+      if first ≤ i && i < last then { h with tagEnd, contentEnd } else h }
+
+/-- Returns the current length of the HTML, in bytes. -/
+def htmlSize : CompileM Nat := do
+  return (← get).html.utf8ByteSize
 
 /--
 Checks that `tag` is an SVG element. This also covers what the HTML parser would restructure, as the
@@ -359,12 +400,17 @@ partial def compileElement (el : Syntax) (path : Array Nat) (ancestors : List St
   else
     checkNesting el[1] tag ancestors
   let svg := inSvg || tag == "svg"
+  checkDuplicateAttrs tag el[2].getArgs
   emit s!"<{tag}"
+  let firstAttr := (← get).attrHoles.size
   for attr in el[2].getArgs do
     compileAttr tag svg path attr
+  let lastAttr := (← get).attrHoles.size
+  let tagEnd ← htmlSize
   let isVoid := !svg && HtmlData.voidElements.contains tag
   if el.isOfKind ``elementSelfClosed then
     -- The HTML parser ignores `/>`, so an element that isn't void would swallow what follows it.
+    setAttrExtent firstAttr lastAttr tagEnd (tagEnd + ">".utf8ByteSize)
     emit (if isVoid then ">" else s!"></{tag}>")
     return
   if nameText el[6] != tag then
@@ -386,6 +432,7 @@ partial def compileElement (el : Syntax) (path : Array Nat) (ancestors : List St
   for child in ← removeComments el[4].getArgs do
     if ← compileChild child (path.push index) tag childAncestors childSvg then
       index := index + 1
+  setAttrExtent firstAttr lastAttr tagEnd (← htmlSize)
   emit s!"</{tag}>"
 
 /--
@@ -411,7 +458,8 @@ partial def compileChild (child : Syntax) (path : Array Nat) (parent : String)
     let value : Term := ⟨child[1]⟩
     -- Type class failures are reported at the code that the macro generates, not at `value`.
     let hole ← withRef value `(Lithe.Hole.child (Lithe.ToChild.toChild $value))
-    modify fun st => { st with childHoles := st.childHoles.push (hole, path) }
+    let site ← `(Lithe.Template.Site.child $(Syntax.mkNumLit (toString (← htmlSize))) $(quote inSvg))
+    modify fun st => { st with childHoles := st.childHoles.push (hole, path, site) }
     emit "<!>"
     return true
   else if child.isOfKind ``childElement then
@@ -429,14 +477,25 @@ end
   let svg := isSvgFragment (nameText stx[0][1])
   let ((), st) ← (compileElement stx[0] #[] [] svg).run {}
   -- Content comes first, so that `value` on a `select` is set after its options exist.
-  let holes := st.childHoles ++ st.attrHoles
+  let holes := st.childHoles.map (fun (term, path, _) => (term, path))
+    ++ st.attrHoles.map fun h => (h.term, h.path)
   let terms := holes.map (·.1)
   let paths ← holes.mapM fun (_, path) => do
     let indices := path.map (Syntax.mkNumLit <| toString ·)
     `(#[$indices,*])
+  let attrSites ← st.attrHoles.mapM fun h => do
+    let num (n : Nat) := Syntax.mkNumLit (toString n)
+    if h.name == "value" && h.tag == "textarea" then
+      `(Lithe.Template.Site.textarea $(num (h.tagEnd + 1)) $(num h.contentEnd))
+    else if h.name == "value" && h.tag == "select" then
+      `(Lithe.Template.Site.select $(num h.tagEnd) $(num h.contentEnd))
+    else
+      `(Lithe.Template.Site.attr $(num h.tagEnd))
+  let sites := st.childHoles.map (·.2.2) ++ attrSites
   let key := s!"{st.html}\x00{holes.map (·.2)}"
   `(Lithe.Html.template
-      (Lithe.Template.mk $(Syntax.mkStrLit st.html) #[$paths,*] $(Syntax.mkStrLit key) $(quote svg))
+      (Lithe.Template.mk $(Syntax.mkStrLit st.html) #[$paths,*] $(Syntax.mkStrLit key) $(quote svg)
+        #[$sites,*])
       #[$terms,*])
 
 end Lithe

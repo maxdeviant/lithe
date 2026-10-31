@@ -95,6 +95,18 @@ def Attr.map (f : α → β) : Attr α → Attr β
   | .on event handler => .on event (handler.map f)
   | .use action => .use action
 
+/-- Where a template's hole goes in its HTML, as byte offsets, for rendering to a string. -/
+inductive Template.Site where
+  /-- Content, which replaces the marker at `pos`, and is in SVG if `svg`. -/
+  | child (pos : Nat) (svg : Bool)
+  /-- Something on an element whose opening tag has its `>` at `pos`. -/
+  | attr (pos : Nat)
+  /-- The value of a `textarea`, which replaces the HTML from `start` to `stop`. -/
+  | textarea (start stop : Nat)
+  /-- The value of a `select`, whose opening tag has its `>` at `start`, and content ends at `stop`. -/
+  | select (start stop : Nat)
+  deriving Inhabited
+
 /--
 The static part of some markup, which a macro computes at compile time. Each instance is a clone of
 `html`, which must have one root element, and `paths` locates the target of each hole of the
@@ -109,6 +121,8 @@ structure Template where
   key : String
   /-- Whether the root is an SVG element that the HTML parser only recognizes inside of `svg`. -/
   svg : Bool := false
+  /-- Where each hole goes in `html`. -/
+  sites : Array Template.Site := #[]
   deriving Inhabited
 
 mutual

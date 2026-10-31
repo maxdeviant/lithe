@@ -26,7 +26,7 @@ def main : IO Unit :=
   ({ init := (0, .none), update, view } : App Nat Msg).mountById "app"
 ```
 
-Apps are pure: `update` and `view` describe state changes, effects, and the page as data. That means you can evaluate views with `#eval`, and prove things about your app.
+Apps are pure: `update` and `view` describe state changes, effects, and the page as data. That means you can evaluate views with `#eval`, render them to a string with `Html.render`, and prove things about your app.
 
 Markup is checked at compile time, and compiles to static HTML with dynamic holes, so updates only compare what can change.
 

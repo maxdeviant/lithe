@@ -131,6 +131,25 @@ example : Html Unit := <table>oops</table>
 #guard_msgs in
 example : Html Unit := <textarea>{"a"}</textarea>
 
+/-- info: "<optgroup><option></option></optgroup>" -/
+#guard_msgs in
+#eval htmlOf (<optgroup><option /></optgroup>)
+
+/-- error: `optgroup` can't be a child of `option`, as the HTML parser would close it -/
+#guard_msgs in
+example : Html Unit := <option><optgroup /></option>
+
+/-- error: `optgroup` can't be a child of `optgroup`, as the HTML parser would move it -/
+#guard_msgs in
+example : Html Unit := <optgroup><optgroup /></optgroup>
+
+/-- error: `div` has the attribute `class` more than once -/
+#guard_msgs in
+example : Html Unit := <div class="a" class={"b"} />
+
+-- More than one action is fine.
+example : Html Unit := <div use={fun _ => pure (pure ())} use={fun _ => pure (pure ())} />
+
 /-- error: `math` can't be used in markup: MathML isn't supported yet -/
 #guard_msgs in
 example : Html Unit := <math />
