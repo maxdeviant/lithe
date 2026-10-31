@@ -18,6 +18,7 @@ Message types are unconstrained, so `Html (Model → Model)` works too. `App.sim
 | `Lithe.Cmd` | Effects as data. |
 | `Lithe.Subscription` | Outside events as data. |
 | `Lithe.Dom` | Mounting, patching, and event delegation. |
+| `Lithe.Hydrate` | Adopting a page that `Html.render` wrote. |
 | `Lithe.Subscription.Sources` | The built-in sources of outside events, such as timers. |
 | `Lithe.App` | The update and render loop. |
 
@@ -110,7 +111,7 @@ Known rough edges, which can't be fixed in the macro:
 
 ## Rendering to a string
 
-`Html.render` returns the HTML for a description, which parses to the same page as mounting it, as `tests/dom/Random.lean` and `tests/dom/Render.lean` check. It has no JS imports, so it also works in `#eval`. Hydration is a separate problem: the output has no markers for holes, so a client can only replace it.
+`Html.render` returns the HTML for a description, which parses to the same page as mounting it, as `tests/dom/Random.lean` and `tests/dom/Render.lean` check. It has no JS imports, so it also works in `#eval`.
 
 **The macro records where each hole goes**, as byte offsets in `Template.sites`. Working it out again from the HTML would take a second parser that has to agree with the first.
 
@@ -122,13 +123,36 @@ Known rough edges, which can't be fixed in the macro:
 
 **Holes can still restructure the output.** A hole's content is added directly to the DOM when mounting, so `<p>{<div />}</p>` works, but the same HTML makes the parser close the `p`. The macro can't see this, as holes aren't checked against what's around them.
 
+## Hydration
+
+`App.hydrate` starts an app on a page that `Html.render` wrote, and keeps its nodes, so that nothing flickers and nothing loses its state. In a benchmark of rows like those in `bench`, including layout, it took 8.6 ms for 1,000 rows in Chrome where replacing them took 24 ms, and 75 ms for 10,000 where replacing them took 234 ms. It was about 2.4 times as fast in Firefox and 3.4 times in WebKit. It adds about 5.5 KB gzipped to a client that uses it, and nothing to one that doesn't, other than a small function that mounting shares with it.
+
+**The HTML has no markers.** The client runs the same view, so it knows what every node has to be. All that the page can't show is where text from different places was merged, and that's found from the length of the text that's expected, with `splitText`. So rendering adds no bytes, and a proxy that strips comments can't break a page. The comment that patching needs after each hole is added by the client. `tests/dom/Hydrate.lean` checks that the result is the same as mounting, down to how text is divided, and that it then patches in the same way.
+
+**Differences are handled by what they affect.** Text or structure that isn't as expected means the page and the view disagree about where things are, so the whole root is replaced, with a message on the console. Attributes outside of holes aren't compared, as they're the same markup on both sides. Attributes in holes are corrected in place, and only if they differ, as setting `src` again restarts loading. Handlers and actions are only added, so nothing has run by the time a difference is found, and replacing needs no undoing.
+
+**The model wins.** Live properties are written as in patching, so what the user typed before the client started is overwritten, and earlier clicks are lost. Replaying those through their handlers is possible later, as the description says which handler each field has.
+
+**An empty root is mounted,** which isn't a mismatch, so a client running on its own with `pnpm dev` needs no other code path. Whitespace at either end of the root is ignored unless the view has text there, as a template's formatting can put it there.
+
+**What parsers do decides most of the details,** and `tests/browser/dom.js` runs these checks in real browsers because of that. Each of these was found by testing:
+
+- `\r\n` in text or an attribute becomes `\n`, unless it's written as a character reference, which `Html.render` now does.
+- WebKit splits long text into several nodes, so the root is normalized first.
+- `noscript` is text in a page with scripting, but in a template it's elements in Chrome and WebKit, and text in Firefox. So its content is never compared, and it can't have holes.
+- NUL becomes U+FFFD, and text in `style` and similar elements can't be escaped, so `Html.render` breaks up `</` there. The first leads to replacing the root, and the second is expected.
+
+**A view has to give the same result on both targets,** or the root is replaced. The results of `toString` on floats and the order of hash maps were the same in a small sample, and `USize` is the one known difference, at 32 bits in LeanScript.
+
+**The model travels as JSON in a `script` element.** `jsonScript` writes one on the server, and `readJsonScript?` reads it with `JSON.parse` and `FromJs`. A module that both sides import can't derive `FromJs`, as that needs JS, so the client uses `deriving instance`. An app builds its `init` from what that returns, so `App` has no part in this.
+
 ## JSON
 
 `Lithe.Json` exists because a native program can't use `Lean.Data.Json` without paying for all of Lean. Lean's C emitter makes a module call `lean_initialize` if any module in its run-time imports has a name that starts with `Lean`, and that function refers to `initialize_Lean`, so the linker keeps the whole compiler. It doesn't matter how small the import is or whether the program is a module: `import Lean.Data.Name` alone takes a program from 1 MB to 101 MB. This is [lean4#5274](https://github.com/leanprover/lean4/issues/5274). `Lithe.Json` adds 0.3 MB to the native test, whose size `pnpm test` checks.
 
 **The form is that of `Js.Deriving`,** rather than that of Lean's own handlers. Enums are strings, other inductive types are objects with a `kind` field, and `none` is `null`. So a client can read what a server writes with `JSON.parse` and `FromJs`, and `tests/dom/Json.lean` checks that it can.
 
-**Clients should read with `JSON.parse` and `FromJs` where they can.** For an array of records, it added 1.8 KB gzipped to a bundle where `Json.decode` added 11.2 KB, and it was 3 to 9 times as fast. The limits are that `FromJs` needs numbers to be safe integers or floats, and has no strings for infinities and `NaN`. `Json.decode` is for native programs, and for values that those limits rule out. For comparison, `Lean.Data.Json` added 33.7 KB to a client.
+**Clients should read with `JSON.parse` and `FromJs` where they can, which is what `readJsonScript?` does.** For an array of records, it added 1.8 KB gzipped to a bundle where `Json.decode` added 11.2 KB, and it was 3 to 9 times as fast. The limits are that `FromJs` needs numbers to be safe integers or floats, and has no strings for infinities and `NaN`. `Json.decode` is for native programs, and for values that those limits rule out. For comparison, `Lean.Data.Json` added 33.7 KB to a client.
 
 **Both targets have to agree,** as a client has to compute the same page as the server. `tests/LitheTest/JsonCases.lean` runs under both, and `pnpm test` compares what they write and read, down to the bits of floats. In the browser build, the results are also checked against `JSON.parse` and `Number`, which share nothing with this code.
 
@@ -188,4 +212,4 @@ Ideas to try if the numbers become a problem, in rough order of expected value:
 
 ## Not in the first version
 
-Server rendering beyond `Html.render`, hydration, `component` syntax, scoped CSS, transitions, MathML, and hot reload that preserves state. A patcher proof is also out, with randomized tests in `tests/dom/Random.lean` standing in for it.
+Replaying what the user did before hydrating, streaming, `component` syntax, scoped CSS, transitions, MathML, and hot reload that preserves state. A patcher proof is also out, with randomized tests in `tests/dom/Random.lean` standing in for it.

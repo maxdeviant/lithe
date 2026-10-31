@@ -30,7 +30,7 @@ Apps are pure: `update` and `view` describe state changes, effects, and the page
 
 Markup is checked at compile time, and compiles to static HTML with dynamic holes, so updates only compare what can change.
 
-`examples/todo` is a complete app, `examples/stopwatch` also listens to timers and the keyboard, `examples/kanban` is a larger app with drag and drop, undo, routes, and storage, and `examples/server` has its page rendered by a native Lean server. Lithe is experimental, as LeanScript itself is.
+`examples/todo` is a complete app, `examples/stopwatch` also listens to timers and the keyboard, `examples/kanban` is a larger app with drag and drop, undo, routes, and storage, and `examples/server` has its page rendered by a native Lean server, which a client then makes live without replacing it. Lithe is experimental, as LeanScript itself is.
 
 ## Development
 

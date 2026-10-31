@@ -10,7 +10,9 @@ A counter whose page comes from a native Lean server, and that LeanScript then m
 
 **The page works before any JS runs**, so it's on screen as soon as the HTML arrives, and it's there for anything that doesn't run JS at all.
 
-**The client replaces the page rather than hydrating it**, as Lithe has no hydration yet. It builds the same page again from the same `initial` state, and takes over the element it's in.
+**The client adopts the page rather than replacing it.** `hydrateById` keeps every node that the server sent, and adds the handlers and actions that HTML can't have, so nothing flickers and nothing loses its state.
+
+**The state comes from the server.** Try <http://localhost:3000/?count=5>. `jsonScript` puts the model in the page as JSON, and `readJsonScript?` reads it with `JSON.parse` and `FromJs`, which adds much less to the client than `Json.decode`. `Counter.lean` can't derive `FromJs`, as that needs JS, so `App.lean` does that with `deriving instance`.
 
 **Actions are the part of a view that needs care.** Lean only links a native program if everything it refers to has a native implementation, so a shared view can use `Action.focus`, but an action of your own has to give its extern a native side too. It's never run there, as rendering leaves actions out:
 
@@ -29,6 +31,6 @@ pnpm build
 lake exe server
 ```
 
-Then open <http://localhost:3000/>. `pnpm dev` runs the client alone, without the server's page. The server's arguments are the port and the directory of the client's build.
+Then open <http://localhost:3000/>. `pnpm dev` runs the client alone, which has no page to adopt, so it builds one from `initial`. The server's arguments are the port and the directory of the client's build.
 
 Open `examples/server` as its own project in your editor, as it's a separate Lake package.

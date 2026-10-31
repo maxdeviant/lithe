@@ -1,6 +1,7 @@
 import Js
 import Lithe.Cmd
 import Lithe.Dom
+import Lithe.Hydrate
 import Lithe.Subscription
 
 /-!
@@ -135,8 +136,9 @@ def syncSources (r : Running Model Msg) : IO Unit := do
 
 end App.Running
 
-/-- Starts `app`, which takes over the contents of `root`. -/
-def App.mount (app : App Model Msg) (root : Js.Dom.Element) : IO Unit := do
+/-- Starts `app`, whose first page in `root` is what `first` makes of the view of its initial state. -/
+private def App.start (app : App Model Msg) (root : Js.Dom.Element)
+    (first : Runtime Msg → Html Msg → IO (Mounted Msg)) : IO Unit := do
   let (model, cmd) := app.init
   let r : Running Model Msg := {
     app
@@ -147,7 +149,7 @@ def App.mount (app : App Model Msg) (root : Js.Dom.Element) : IO Unit := do
     sources := ← IO.mkRef {}
   }
   let rt ← Runtime.new root.val (App.Running.dispatch r)
-  let mounted ← IO.mkRef (Mounted.empty : Mounted Msg)
+  let mounted ← IO.mkRef (← first rt (app.view model))
   let render : IO Unit := do
     r.scheduled.set false
     let html := app.view (← r.model.get)
@@ -156,14 +158,34 @@ def App.mount (app : App Model Msg) (root : Js.Dom.Element) : IO Unit := do
     rt.runActions
     r.syncSources
   r.renderJs.set (← toJs render)
-  Raw.clearChildren root.val
-  render
+  rt.runActions
+  r.syncSources
   App.Running.perform r cmd
+
+/-- Starts `app`, which takes over the contents of `root`. -/
+def App.mount (app : App Model Msg) (root : Js.Dom.Element) : IO Unit :=
+  app.start root fun rt html => do
+    Raw.clearChildren root.val
+    rt.mount root.val .null html
+
+/--
+Starts `app`, which adopts the contents of `root`, as `Html.render` wrote them for the view of its
+initial state. What's in `root` is replaced if it turns out to be something else.
+-/
+def App.hydrate (app : App Model Msg) (root : Js.Dom.Element) : IO Unit :=
+  app.start root fun rt html => do
+    return (← rt.hydrateRoot root.val html).1
 
 /-- Starts `app` in the element with the ID `id`, throwing an error if there is none. -/
 def App.mountById (app : App Model Msg) (id : String) : IO Unit := do
   let some root ← (← Js.Dom.document).getElementById id
     | throw (.userError s!"no element with ID {id}")
   app.mount root
+
+/-- Starts `app` in the element with the ID `id`, adopting its contents, or throws if there is none. -/
+def App.hydrateById (app : App Model Msg) (id : String) : IO Unit := do
+  let some root ← (← Js.Dom.document).getElementById id
+    | throw (.userError s!"no element with ID {id}")
+  app.hydrate root
 
 end Lithe

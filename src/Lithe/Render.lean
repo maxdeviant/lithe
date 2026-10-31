@@ -1,6 +1,7 @@
 module
 
 public import Lithe.Html
+public import Lithe.Json
 
 /-!
 Renders `Html` to a string of HTML, which parses to the same page that mounting it builds, without
@@ -212,5 +213,9 @@ end Render
 /-- Returns the HTML for `h`, which leaves out handlers and actions. -/
 def Html.render (h : Html Msg) : String :=
   Render.renderTo "" false false h
+
+/-- Returns the HTML of an element with the ID `id` that holds `a` as JSON, for a client to read. -/
+def jsonScript [ToJson α] (id : String) (a : α) : String :=
+  s!"<script id=\"{Render.escapeAttr id}\" type=\"application/json\">{Json.encode a}</script>"
 
 end Lithe

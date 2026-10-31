@@ -3,7 +3,7 @@ module
 import Counter
 import Std.Http
 
-open Std Std.Async Std.Http
+open Lithe Std Std.Async Std.Http
 
 /-! The server, which is a native program. It serves the client's build, with the page already in it. -/
 
@@ -14,22 +14,28 @@ def contentType : Option String → String
   | some "html" => "text/html; charset=utf-8"
   | _ => "application/octet-stream"
 
-/-- Returns `template` with the page in its element for the app. -/
-def renderPage (template : String) : String :=
-  template.replace "<div id=\"app\"></div>" s!"<div id=\"app\">{(view initial).render}</div>"
+/-- Returns `template` with the page for `model` in its element for the app, and `model` after it. -/
+def renderPage (template : String) (model : Model) : String :=
+  template.replace "<div id=\"app\"></div>"
+    s!"<div id=\"app\">{(view model).render}</div>{jsonScript "model" model}"
+
+/-- Returns the count that the query of a request asks for, as in `?count=5`. -/
+def countOf (query : String) : Nat :=
+  ((query.splitOn "count=")[1]?.bind String.toNat?).getD initial.count
 
 /-- What the server needs to respond to requests. -/
 structure Site where
   /-- The directory of the client's build. -/
   dist : System.FilePath
-  /-- The page, with its content already in it. -/
-  page : String
+  /-- The HTML of the client's build, which has no content yet. -/
+  template : String
 
 /-- Returns the response for a request for `target`. -/
 def Site.respond (site : Site) (target : String) : Async (Response Body.Full) := do
   let path := (target.splitOn "?").head!
   if path == "/" then
-    return ← Response.ok |>.html site.page
+    let query := ((target.splitOn "?")[1]?).getD ""
+    return ← Response.ok |>.html (renderPage site.template (initial (countOf query)))
   -- Encoded characters are never in the client's build, so this also rules out an encoded `..`.
   if path.contains '%' || (path.splitOn "/").contains ".." then
     return ← Response.notFound |>.text "Not found"
@@ -46,9 +52,9 @@ instance : Server.Handler Site where
 
 /-- Serves `dist` on `port`, where 0 means any port, until the program is stopped. -/
 def serve (port : UInt16) (dist : System.FilePath) : Async Unit := do
-  let page := renderPage (← IO.FS.readFile (dist / "index.html"))
+  let template ← IO.FS.readFile (dist / "index.html")
   let address : Net.SocketAddress := .v4 { addr := .ofParts 127 0 0 1, port }
-  let server ← Server.serve address ({ dist, page } : Site)
+  let server ← Server.serve address ({ dist, template } : Site)
   let some (.v4 bound) := server.localAddr | throw (.userError "the server has no address")
   IO.println s!"listening on http://localhost:{bound.port}/"
   (← IO.getStdout).flush

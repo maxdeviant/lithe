@@ -40,6 +40,8 @@ try {
   assert.match(response.headers.get("content-type"), /^text\/html/);
   const html = await response.text();
   assert.match(html, /<output id="count">3<\/output>/);
+  assert.match(html, /<h1>Count &lt;\/script&gt; &amp; &lt;more&gt;<\/h1>/);
+  assert.match(html, /<script id="model" type="application\/json">\{"count":3,"title":"Count \\u003c\/script> & \\u003cmore>"\}<\/script>/);
   assert.match(html, /<rect id="bar" height="1" width="3"><\/rect>/);
   assert.doesNotMatch(html, /<div id="app"><\/div>/);
   assert.doesNotMatch(html, /onclick/, "handlers have no form in HTML");
@@ -72,14 +74,35 @@ try {
       errors.push(m.text());
     }
   });
-  await page.goto(url);
+  // Holds the client back, to mark what's on the page before it runs.
+  let release;
+  const gate = new Promise((resolve) => (release = resolve));
+  await page.route("**/assets/*.js", async (route) => {
+    await gate;
+    await route.continue();
+  });
+  await page.goto(`${url}?count=5`, { waitUntil: "commit" });
+  await page.waitForSelector("#bar", { state: "attached" });
+  assert.equal(await page.locator("#count").textContent(), "5", "the server chose the count");
+  await page.evaluate(() => {
+    window.kept = [...document.querySelectorAll("#app *")];
+  });
+  release();
   await page.waitForFunction(() => document.activeElement?.id === "increment");
-  assert.equal(await page.locator("main").count(), 1, "the client replaces the server's page");
+  assert.equal(
+    await page.evaluate(() => {
+      const now = [...document.querySelectorAll("#app *")];
+      return now.length === window.kept.length && now.every((e, i) => e === window.kept[i]);
+    }),
+    true,
+    "the client keeps every element from the server",
+  );
+  assert.equal(await page.locator("h1").textContent(), "Count </script> & <more>");
   await page.locator("#increment").click();
   await page.locator("#increment").click();
   await page.locator("#decrement").click();
-  await page.waitForFunction(() => document.querySelector("#count").textContent === "4");
-  assert.equal(await page.locator("#bar").getAttribute("width"), "4");
+  await page.waitForFunction(() => document.querySelector("#count").textContent === "6");
+  assert.equal(await page.locator("#bar").getAttribute("width"), "6");
   assert.deepEqual(errors, [], "the page reported no errors");
   console.log(`ok   server example in ${label}`);
 } finally {
