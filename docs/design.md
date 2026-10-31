@@ -40,7 +40,7 @@ Lithe has two targets. `Lithe` is for LeanScript, and `Lithe.Core` is for code t
 - Handlers are Lean closures in a table that only Lean reads.
 - Handlers should capture IDs, not the model. The previous tree is alive while `update` runs, so a handler that captures the model should force a copy on each update. This is inferred, not measured.
 
-**Compile-time code must be `meta`.** A plain `import Lean` puts the compiler's initializers in the program, and the build fails on missing externs. `Lithe.Syntax` uses `public meta import Lean` and a `public meta section`, as `Js.Deriving` does. `Lithe.Html` is a module because `Lithe.Syntax` imports it. `Lithe.Dom` can't be one, as `Js.Dom` isn't.
+**Compile-time code must be `meta`.** A plain `import Lean` puts the compiler's initializers in the program, and the build fails on missing externs. `Lithe.Syntax` uses `public meta import Lean` and a `public meta section`, as `Js.Deriving` does. `Lithe.Html` is a module because `Lithe.Syntax` imports it.
 
 **Tasks can't be canceled.** `IO.cancel` does nothing, so `Cmd.latest` drops the results of superseded effects, but those effects still run to completion.
 
@@ -142,29 +142,28 @@ The rule is that patching stays in Lean unless benchmarking shows both of these:
 1. An update misses the 16 ms frame budget.
 2. The profile shows the time going to the calls from Lean to the DOM, not to `view` or the diff.
 
-`node bench/run.js --profile` runs js-framework-benchmark's operations in Chrome. These are the results from 2026-10-30, with LeanScript 0.1.0 on one machine, in milliseconds:
+`node bench/run.js --profile` runs js-framework-benchmark's operations in Chrome. These are the results from 2026-10-31, with LeanScript 0.2.0 on one machine, in milliseconds:
 
 | Operation | Script | With layout | Slowest with layout |
 |---|---:|---:|---:|
-| Create 1,000 rows | 21.8 | 34.3 | 41.7 |
-| Replace 1,000 rows | 23.1 | 36.3 | 39.0 |
-| Update every 10th row of 1,000 | 7.9 | 11.7 | 16.4 |
-| Select a row of 1,000 | 8.0 | 8.0 | 10.2 |
-| Swap 2 rows of 1,000 | 14.6 | 15.9 | 24.7 |
-| Remove a row of 1,000 | 13.5 | 15.1 | 18.4 |
-| Append 1,000 rows to 1,000 | 31.1 | 45.2 | 48.3 |
-| Clear 1,000 rows | 6.9 | 6.9 | 9.2 |
-| Create 10,000 rows | 181.3 | 321.4 | 349.0 |
-| Update every 10th row of 10,000 | 73.4 | 113.5 | 121.6 |
+| Create 1,000 rows | 16.4 | 29.4 | 34.9 |
+| Replace 1,000 rows | 18.5 | 30.8 | 32.4 |
+| Update every 10th row of 1,000 | 6.1 | 9.6 | 16.5 |
+| Select a row of 1,000 | 6.0 | 6.0 | 7.9 |
+| Swap 2 rows of 1,000 | 9.9 | 11.1 | 20.0 |
+| Remove a row of 1,000 | 10.3 | 11.5 | 18.9 |
+| Append 1,000 rows to 1,000 | 22.7 | 36.3 | 41.2 |
+| Clear 1,000 rows | 6.2 | 6.3 | 7.2 |
+| Create 10,000 rows | 133.4 | 273.5 | 314.0 |
+| Update every 10th row of 10,000 | 38.9 | 76.6 | 87.6 |
 
-**Conclusion: no change is justified.** The updates to existing rows of 1,000 meet the budget at the median, although close to it in the case of swap and remove. Creating rows misses it, but the profile doesn't point to the Lean-to-DOM boundary: most of the time is split between native DOM work, which moving to JS can't remove, and the runtime's bookkeeping, such as reference counting and allocation.
+**Conclusion: no change is justified.** The updates to existing rows of 1,000 meet the budget at the median, although the slowest runs of update, swap, and remove go over it. Creating rows misses it, but the profile doesn't point to the Lean-to-DOM boundary: most of the time is split between native DOM work, which moving to JS can't remove, and the runtime's bookkeeping, such as reference counting and allocation.
 
 Ideas to try if the numbers become a problem, in rough order of expected value:
 
-- Look up parsed templates by object rather than by hashing the key. `hashBytes` is about 4% to 8% of the JS self time when creating rows.
+- Look up parsed templates by object rather than by hashing the key. `hashBytes` is about 10% of the self time when creating rows.
 - Skip the view of unchanged rows with a memoizing `lazy` node. Note that a memo that retains part of the model stops that part from being updated in place.
 - Find holes with `firstChild` and `nextSibling` rather than `childNodes[i]`.
-- Upgrade LeanScript, as `main` has inlining work that 0.1.0 doesn't.
 
 ## Not in the first version
 

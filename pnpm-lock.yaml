@@ -167,8 +167,8 @@ importers:
   .:
     devDependencies:
       '@leanscript/runtime':
-        specifier: 0.1.0
-        version: 0.1.0
+        specifier: 0.2.0
+        version: 0.2.0
       html-element-attributes:
         specifier: ^3.5.0
         version: 3.5.0
@@ -197,8 +197,8 @@ importers:
   bench:
     dependencies:
       '@leanscript/vite-plugin':
-        specifier: 0.1.0
-        version: 0.1.0(vite@8.3.5)
+        specifier: 0.2.0
+        version: 0.2.0(vite@8.3.5)
     devDependencies:
       vite:
         specifier: ^8.3.5
@@ -207,8 +207,8 @@ importers:
   examples/kanban:
     dependencies:
       '@leanscript/vite-plugin':
-        specifier: 0.1.0
-        version: 0.1.0(vite@8.3.5)
+        specifier: 0.2.0
+        version: 0.2.0(vite@8.3.5)
     devDependencies:
       vite:
         specifier: ^8.3.5
@@ -217,8 +217,8 @@ importers:
   examples/server:
     dependencies:
       '@leanscript/vite-plugin':
-        specifier: 0.1.0
-        version: 0.1.0(vite@8.3.5)
+        specifier: 0.2.0
+        version: 0.2.0(vite@8.3.5)
     devDependencies:
       vite:
         specifier: ^8.3.5
@@ -227,8 +227,8 @@ importers:
   examples/stopwatch:
     dependencies:
       '@leanscript/vite-plugin':
-        specifier: 0.1.0
-        version: 0.1.0(vite@8.3.5)
+        specifier: 0.2.0
+        version: 0.2.0(vite@8.3.5)
     devDependencies:
       vite:
         specifier: ^8.3.5
@@ -237,8 +237,8 @@ importers:
   examples/todo:
     dependencies:
       '@leanscript/vite-plugin':
-        specifier: 0.1.0
-        version: 0.1.0(vite@8.3.5)
+        specifier: 0.2.0
+        version: 0.2.0(vite@8.3.5)
     devDependencies:
       vite:
         specifier: ^8.3.5
@@ -303,11 +303,11 @@ packages:
       '@noble/hashes':
         optional: true
 
-  '@leanscript/runtime@0.1.0':
-    resolution: {integrity: sha512-BrKNYVw8da4CnTq6zAQWOs1eVmn7ZfFOlvhRZZW0Lscuqy+RqctoN2Qr2ZAmWU6eEymEyWme4akmoeFmou45bA==}
+  '@leanscript/runtime@0.2.0':
+    resolution: {integrity: sha512-T4+DGbP9GrzjCB7co5W8Q/A12WohdM3LARSdESmS3UKYa/YXPxhQY+LwN8IUR2pa0yqmNUku7SuINgBy9dk++Q==}
 
-  '@leanscript/vite-plugin@0.1.0':
-    resolution: {integrity: sha512-+9ZxnkteVtxmOzv71cNX8//ESOQEUpFw3X1qhp2EPLnEX2DZTf8PYLwAZOyEB5SpqMP52RyxbHMIyYMbkG4//A==}
+  '@leanscript/vite-plugin@0.2.0':
+    resolution: {integrity: sha512-P3+WzPZiE4gDVgv0yOV0duiH6MRwRa5E5c6LRhDxxtqRJlfem4Uq4FM1X2ZNUYTtoLA10ilDVzZ4p5zIToOluw==}
     peerDependencies:
       vite: '>=6'
 
@@ -745,11 +745,11 @@ snapshots:
 
   '@exodus/bytes@1.16.0': {}
 
-  '@leanscript/runtime@0.1.0': {}
+  '@leanscript/runtime@0.2.0': {}
 
-  '@leanscript/vite-plugin@0.1.0(vite@8.3.5)':
+  '@leanscript/vite-plugin@0.2.0(vite@8.3.5)':
     dependencies:
-      '@leanscript/runtime': 0.1.0
+      '@leanscript/runtime': 0.2.0
       vite: 8.3.5
 
   '@oxc-project/types@0.156.0': {}
