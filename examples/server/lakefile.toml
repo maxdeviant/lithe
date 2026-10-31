@@ -1,0 +1,12 @@
+name = "server"
+
+[[require]]
+name = "lithe"
+path = "../.."
+
+[[lean_lib]]
+name = "Counter"
+
+[[lean_exe]]
+name = "server"
+root = "Server"

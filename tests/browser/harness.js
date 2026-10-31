@@ -15,8 +15,13 @@ const browsers = {
   webkit: { label: "WebKit", launch: () => webkit.launch({ headless: true }) },
 };
 
+// Returns the browser that `BROWSER` names.
+export function selectedBrowser() {
+  return browsers[process.env.BROWSER ?? "chrome"];
+}
+
 export async function withExample(name, use) {
-  const { label, launch } = browsers[process.env.BROWSER ?? "chrome"];
+  const { label, launch } = selectedBrowser();
   const example = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "examples", name);
   const dist = join(example, "dist");
 

@@ -10,12 +10,27 @@ Message types are unconstrained, so `Html (Model → Model)` works too. `App.sim
 
 | Module | Role |
 |---|---|
+| `Lithe.Core` | Everything below that has no JS dependencies, for code that native Lean also compiles. |
 | `Lithe.Html` | The pure description of a page. Has no JS imports. |
 | `Lithe.Syntax` | The markup macro. Runs only at compile time. |
-| `Lithe.Dom` | Mounting, patching, and event delegation. |
+| `Lithe.Render` | Rendering `Html` to a string. |
 | `Lithe.Cmd` | Effects as data. |
 | `Lithe.Subscription` | Outside events as data. |
+| `Lithe.Dom` | Mounting, patching, and event delegation. |
+| `Lithe.Subscription.Sources` | The built-in sources of outside events, such as timers. |
 | `Lithe.App` | The update and render loop. |
+
+## Native Lean
+
+Lithe has two targets. `Lithe` is for LeanScript, and `Lithe.Core` is for code that both targets compile, such as the view of a page that a native server renders and a client then runs.
+
+**What breaks only shows up when linking.** `@[extern js inline]` compiles to a call to a symbol that nothing defines in a native program, so `#eval` and building oleans both work, and `import Lithe` fails later with undefined symbols from `Js.Value`. So `tests/LitheNativeTest.lean` is a native program, which `pnpm test` links and runs, and `examples/server` is another.
+
+**An extern that a view needs has a native side as well**, as in `@[extern c inline "lean_io_result_mk_ok(lean_box(0))" js inline "..."]`. LeanScript takes the `js` entry and native Lean takes the `c` one. `ElementHandle.focus` does this so that `Action.focus` is in `Lithe.Core`. It does nothing, as nothing runs actions natively.
+
+**Subscriptions are split.** The type and `Subscription.source` are data, so they're in `Lithe.Core`, and a shared module can define `subscriptions` with sources of its own. The built-in sources call the browser, so a function that uses `Subscription.every` belongs on the client.
+
+**The markup macro makes native programs large.** A program using markup is about 100 MB and takes about 20 ms to start, compared with about 2 MB and 3 ms with `Lithe.Render` alone, as it links all of `Lean`. This doesn't apply to LeanScript, which only includes what's reachable.
 
 ## Constraints from LeanScript
 

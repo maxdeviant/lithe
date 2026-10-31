@@ -138,11 +138,6 @@ end Raw
 @[extern js inline "#1"]
 opaque ElementHandle.toElement (h : @& ElementHandle) : Js.Dom.HtmlElement
 
-/-- An action that focuses its element. -/
-def Action.focus : Action := fun h => do
-  h.toElement.focus
-  return pure ()
-
 /-- Returns the snapshot of the DOM event `e`. -/
 def Event.ofJs (e : JsValue) : IO Event := do
   return {

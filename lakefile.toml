@@ -15,3 +15,9 @@ srcDir = "src"
 [[lean_lib]]
 name = "LitheTest"
 srcDir = "tests"
+
+# Checks that `Lithe.Core` links and works in a native program.
+[[lean_exe]]
+name = "lithe-native-test"
+srcDir = "tests"
+root = "LitheNativeTest"

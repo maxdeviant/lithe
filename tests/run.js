@@ -1,4 +1,4 @@
-// Builds the macro tests, checks where errors in holes are reported, then compiles each program in
+// Builds the macro tests, checks where errors in holes are reported, runs the native program, then compiles each program in
 // `tests/dom` for the browser and runs it in a page made with jsdom. A program passes if it finishes
 // without printing `FAIL`.
 
@@ -56,6 +56,15 @@ if (JSON.stringify(parseErrors) !== JSON.stringify(expectedParseErrors)) {
   process.exit(1);
 }
 console.log("ok   parse errors");
+
+// This is the only check that links anything for native Lean, which is where a JS dependency would
+// show up: `#eval` and building oleans both work without one being implemented.
+const native = run("lake", ["exe", "lithe-native-test"]);
+if (native.status !== 0) {
+  console.log(`FAIL native\n${native.stdout}${native.stderr}`);
+  process.exit(1);
+}
+console.log("ok   native");
 
 const only = process.argv[2];
 let failures = 0;

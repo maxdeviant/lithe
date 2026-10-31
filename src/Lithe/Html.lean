@@ -78,6 +78,15 @@ when the element is removed.
 -/
 abbrev Action := ElementHandle → IO (IO Unit)
 
+/-- Focuses `h`. Native programs have no elements to give it, so it does nothing there. -/
+@[extern c inline "lean_io_result_mk_ok(lean_box(0))" js inline "(#1.focus(), 0)"]
+opaque ElementHandle.focus (h : @& ElementHandle) : BaseIO Unit
+
+/-- An action that focuses its element. -/
+def Action.focus : Action := fun h => do
+  h.focus
+  return pure ()
+
 /-- Something that can be set on an element. -/
 inductive Attr (Msg : Type) where
   /-- An attribute or, for those that track user input such as `value`, a property. -/

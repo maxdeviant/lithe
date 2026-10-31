@@ -1,0 +1,18 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, sans-serif;
+}
+
+main {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-top: 4rem;
+}
+
+svg {
+  fill: currentColor;
+  height: 1rem;
+  width: 10rem;
+}
