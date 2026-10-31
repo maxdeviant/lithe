@@ -14,6 +14,7 @@ Message types are unconstrained, so `Html (Model → Model)` works too. `App.sim
 | `Lithe.Html` | The pure description of a page. Has no JS imports. |
 | `Lithe.Syntax` | The markup macro. Runs only at compile time. |
 | `Lithe.Render` | Rendering `Html` to a string. |
+| `Lithe.Json` | JSON, and the deriving handlers for it. |
 | `Lithe.Cmd` | Effects as data. |
 | `Lithe.Subscription` | Outside events as data. |
 | `Lithe.Dom` | Mounting, patching, and event delegation. |
@@ -120,6 +121,26 @@ Known rough edges, which can't be fixed in the macro:
 **Attributes can't be repeated in markup**, as `setAttribute` makes the last one win and the HTML parser keeps the first. `Html.elem` isn't checked.
 
 **Holes can still restructure the output.** A hole's content is added directly to the DOM when mounting, so `<p>{<div />}</p>` works, but the same HTML makes the parser close the `p`. The macro can't see this, as holes aren't checked against what's around them.
+
+## JSON
+
+`Lithe.Json` exists because a native program can't use `Lean.Data.Json` without paying for all of Lean. Lean's C emitter makes a module call `lean_initialize` if any module in its run-time imports has a name that starts with `Lean`, and that function refers to `initialize_Lean`, so the linker keeps the whole compiler. It doesn't matter how small the import is or whether the program is a module: `import Lean.Data.Name` alone takes a program from 1 MB to 101 MB. This is [lean4#5274](https://github.com/leanprover/lean4/issues/5274). `Lithe.Json` adds 0.3 MB to the native test, whose size `pnpm test` checks.
+
+**The form is that of `Js.Deriving`,** rather than that of Lean's own handlers. Enums are strings, other inductive types are objects with a `kind` field, and `none` is `null`. So a client can read what a server writes with `JSON.parse` and `FromJs`, and `tests/dom/Json.lean` checks that it can.
+
+**Clients should read with `JSON.parse` and `FromJs` where they can.** For an array of records, it added 1.8 KB gzipped to a bundle where `Json.decode` added 11.2 KB, and it was 3 to 9 times as fast. The limits are that `FromJs` needs numbers to be safe integers or floats, and has no strings for infinities and `NaN`. `Json.decode` is for native programs, and for values that those limits rule out. For comparison, `Lean.Data.Json` added 33.7 KB to a client.
+
+**Both targets have to agree,** as a client has to compute the same page as the server. `tests/LitheTest/JsonCases.lean` runs under both, and `pnpm test` compares what they write and read, down to the bits of floats. In the browser build, the results are also checked against `JSON.parse` and `Number`, which share nothing with this code.
+
+**Floats read back exactly.** `Lean.Data.Json` writes them through `toString`, which keeps 6 decimals, and that would change what a view shows. Here they have the fewest digits that read back as the same bits, which are the digits that JS writes, and reading rounds correctly, with no dependency on either platform's conversions. Infinities and `NaN` are strings, as JSON has no numbers for them. `-0` is a number, and `Json.Number` keeps its sign apart for that reason.
+
+**Numbers keep their exponent apart,** so `1e1000000` costs nothing to read. Only `toNat?` and `toInt?` expand one, up to an exponent of 4096.
+
+**`<` is always escaped,** as `\u003c`, so `compress` is safe to put in a `script` element without a separate form for that. `<` can only be in strings, where this means the same thing.
+
+**Nesting is limited to 128 levels,** as otherwise input could exhaust the stack, which can't be caught in Lean. The deepest that worked from the top of the stack was 462 in Chrome, 2,343 in Firefox, and 6,787 in WebKit, for objects, which use more stack than arrays.
+
+**Objects are arrays of fields,** which keep their order and need no tree map in the bundle. Looking up a field is linear, and the last of a repeated field counts, as in `JSON.parse`.
 
 ## Subscriptions
 

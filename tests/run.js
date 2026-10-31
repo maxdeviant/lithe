@@ -72,6 +72,14 @@ if (nativeSize > 20_000_000) {
 }
 console.log("ok   native");
 
+// Returns the lines of a program's output that it prints for comparing targets.
+function transcriptOf(stdout) {
+  return stdout
+    .split("\n")
+    .filter((line) => line.startsWith("json "))
+    .join("\n");
+}
+
 const only = process.argv[2];
 let failures = 0;
 for (const file of readdirSync(programs).sort()) {
@@ -103,6 +111,11 @@ for (const file of readdirSync(programs).sort()) {
   const passed =
     result.status === 0 && !result.stdout.includes("FAIL") && result.stdout.includes("finished");
   const details = process.env.VERBOSE || !passed ? `\n${result.stdout}${result.stderr}` : "";
+  // JSON that a native program writes has to mean the same to a client, and the other way around.
+  if (name === "Json" && transcriptOf(result.stdout) !== transcriptOf(native.stdout)) {
+    console.log(`FAIL JSON differs between native Lean and LeanScript`);
+    failures++;
+  }
   console.log(`${passed ? "ok  " : "FAIL"} ${name}${details}`);
   if (!passed) {
     failures++;

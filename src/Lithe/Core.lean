@@ -2,6 +2,7 @@ module
 
 public import Lithe.Cmd
 public import Lithe.Html
+public import Lithe.Json.Deriving
 public import Lithe.Render
 public import Lithe.Subscription
 public import Lithe.Syntax

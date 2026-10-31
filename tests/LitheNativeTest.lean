@@ -1,6 +1,7 @@
 module
 
 import Lithe.Core
+import LitheTest.JsonCases
 
 open Lithe
 
@@ -52,4 +53,8 @@ public def main : IO UInt32 := do
   -- The native side of this extern is otherwise never run.
   let cleanup ← Action.focus fakeHandle
   cleanup
-  return if rendered && described then 0 else 1
+  for failure in LitheTest.JsonCases.failures do
+    IO.eprintln s!"FAIL JSON: {failure}"
+  for line in LitheTest.JsonCases.transcript do
+    IO.println s!"json {line}"
+  return if rendered && described && LitheTest.JsonCases.failures.isEmpty then 0 else 1
