@@ -19,6 +19,8 @@ A kanban board written with Lithe, which is large enough to show how the pieces 
 
 **The card dialog** is a real `<dialog>`, which an action shows as a modal and closes on removal, which gives focus back. The browser handles Escape, and the `close` event tells the model.
 
+**The chart** in the toolbar is SVG in markup, with each bar written as a `rect` in its own function.
+
 **Saving** is an effect of each change to the board, and a failure appears on the page. Loading happens in `main`, before the app starts, so the page never shows a board that's about to be replaced.
 
 ## Running

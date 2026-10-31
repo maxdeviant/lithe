@@ -5,14 +5,21 @@ import { htmlElementAttributes } from "html-element-attributes";
 import { htmlEventAttributes } from "html-event-attributes";
 import { htmlTagNames } from "html-tag-names";
 import { htmlVoidElements } from "html-void-elements";
+import { svgElementAttributes } from "svg-element-attributes";
+import { svgTagNames } from "svg-tag-names";
 
 const list = (names) => `[${[...names].sort().map((n) => JSON.stringify(n)).join(", ")}]`;
 
-const elementAttributes = Object.entries(htmlElementAttributes)
-  .filter(([tag]) => tag !== "*")
-  .sort(([a], [b]) => a.localeCompare(b))
-  .map(([tag, attrs]) => `  (${JSON.stringify(tag)}, ${list(attrs)})`)
-  .join(",\n");
+const perElement = (table) =>
+  Object.entries(table)
+    .filter(([tag]) => tag !== "*")
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([tag, attrs]) => `  (${JSON.stringify(tag)}, ${list(attrs)})`)
+    .join(",\n");
+
+// The media elements only work in the HTML namespace, and the HTML parser leaves SVG for `font` if it
+// has certain attributes, so all of these belong in `foreignObject` if they are used at all.
+const notInSvg = ["audio", "canvas", "font", "iframe", "video"];
 
 const output = `module
 
@@ -43,7 +50,20 @@ def eventAttributes : List String :=
 
 /-- The attributes that are specific to each HTML element. -/
 def elementAttributes : List (String × List String) := [
-${elementAttributes}
+${perElement(htmlElementAttributes)}
+]
+
+/-- The SVG element names, which are case-sensitive. -/
+def svgTagNames : List String :=
+  ${list(svgTagNames.filter((tag) => !notInSvg.includes(tag)))}
+
+/-- The attributes that every SVG element accepts. -/
+def svgGlobalAttributes : List String :=
+  ${list(svgElementAttributes["*"])}
+
+/-- The attributes that are specific to each SVG element. -/
+def svgElementAttributes : List (String × List String) := [
+${perElement(svgElementAttributes)}
 ]
 
 end Lithe.HtmlData

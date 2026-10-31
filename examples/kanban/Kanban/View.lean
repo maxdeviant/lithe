@@ -136,6 +136,26 @@ def viewFilter (m : Model) (label : Label) : Html Msg :=
     onclick={Msg.toggleFilter label}
   >{label.name}</button>
 
+/-- Returns the bar for `column`, the `i`th in a chart whose tallest bar has `most` cards. -/
+def viewBar (b : Board) (most : Nat) (column : Column) (i : Nat) : Html Msg :=
+  let count := (b.cardsIn column.id).size;
+  let height := count * 24 / max most 1;
+  <rect x={i * 12} y={24 - height} width="10" height={height}>
+    <title>{s!"{column.name}: {count}"}</title>
+  </rect>
+
+/-- Returns the chart of how many cards each column has. -/
+def viewChart (b : Board) : Html Msg :=
+  let most := b.columns.foldl (fun n c => max n (b.cardsIn c.id).size) 0;
+  <svg
+    class="chart"
+    role="img"
+    aria-label="Cards in each column"
+    viewBox={s!"0 0 {b.columns.size * 12} 24"}
+  >
+    {Html.forEach b.columns.zipIdx (·.1.id) fun (c, i) => viewBar b most c i}
+  </svg>
+
 /-- Returns the toolbar. -/
 def viewToolbar (m : Model) : Html Msg :=
   <header class="toolbar">
@@ -149,6 +169,7 @@ def viewToolbar (m : Model) : Html Msg :=
       oninput={Msg.setSearch}
     />
     <div class="filters">{Html.forEach Label.all (·.name) (viewFilter m)}</div>
+    {viewChart m.board}
     <button id="undo" disabled={m.past.isEmpty} onclick={Msg.undo}>Undo</button>
     <button id="redo" disabled={m.future.isEmpty} onclick={Msg.redo}>Redo</button>
   </header>

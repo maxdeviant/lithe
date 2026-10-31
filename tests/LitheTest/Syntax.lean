@@ -131,9 +131,92 @@ example : Html Unit := <table>oops</table>
 #guard_msgs in
 example : Html Unit := <textarea>{"a"}</textarea>
 
-/-- error: `svg` can't be used in markup: SVG isn't supported yet -/
+/-- error: `math` can't be used in markup: MathML isn't supported yet -/
 #guard_msgs in
-example : Html Unit := <svg />
+example : Html Unit := <math />
+
+/-- Returns whether the template that `h` is an instance of has to be parsed inside of `svg`. -/
+def svgOf : Html Unit → Bool
+  | .template t _ => t.svg
+  | _ => false
+
+-- SVG names keep their case, and self-closed elements are written out like any other.
+/-- info: "<svg viewBox=\"0 0 10 10\"><linearGradient id=\"g\"></linearGradient><path d=\"M0 0\" stroke-width=\"2\"></path></svg>" -/
+#guard_msgs in
+#eval htmlOf (
+  <svg viewBox="0 0 10 10">
+    <linearGradient id="g" />
+    <path d="M0 0" stroke-width="2" />
+  </svg>)
+
+-- Only a root that the HTML parser wouldn't recognize needs `svg` around it when parsing.
+/-- info: [false, true, true, false, false] -/
+#guard_msgs in
+#eval [(<svg />), (<rect />), (<image />), (<a />), (<title>t</title>)].map svgOf
+
+-- `image` isn't void in SVG, and `a` and `title` follow SVG's rules here, not HTML's.
+/-- info: "<svg><image></image><a><a></a></a><title><!></title><style><!></style></svg>" -/
+#guard_msgs in
+#eval htmlOf (<svg><image /><a><a /></a><title>{"t"}</title><style>{"s"}</style></svg>)
+
+/-- info: #[#[1, 0], #[0]] -/
+#guard_msgs in
+#eval pathsOf (<svg><circle r={1} /><text>{"t"}</text></svg>)
+
+-- HTML in `foreignObject` follows HTML's rules, but only those that apply across SVG.
+/-- info: "<p><svg><foreignObject><div><br></div></foreignObject></svg></p>" -/
+#guard_msgs in
+#eval htmlOf (<p><svg><foreignObject><div><br /></div></foreignObject></svg></p>)
+
+/-- error: `a` can't be inside of `a`, as the HTML parser would close it -/
+#guard_msgs in
+example : Html Unit := <a><svg><foreignObject><a /></foreignObject></svg></a>
+
+/-- error: `div` isn't an SVG element, so HTML has to go in `foreignObject` -/
+#guard_msgs in
+example : Html Unit := <svg><div /></svg>
+
+/-- error: `div` isn't an SVG element, so HTML has to go in `foreignObject` -/
+#guard_msgs in
+example : Html Unit := <rect><div /></rect>
+
+/-- error: `video` isn't an SVG element, so HTML has to go in `foreignObject` -/
+#guard_msgs in
+example : Html Unit := <svg><video /></svg>
+
+/-- error: `lineargradient` isn't an SVG element, so HTML has to go in `foreignObject` -/
+#guard_msgs in
+example : Html Unit := <svg><lineargradient /></svg>
+
+/-- error: `my-element` isn't an SVG element, so HTML has to go in `foreignObject` -/
+#guard_msgs in
+example : Html Unit := <svg><my-element /></svg>
+
+/-- error: `rect` has no attribute `cx` -/
+#guard_msgs in
+example : Html Unit := <rect cx="1" />
+
+/-- error: `svg` has no attribute `viewbox` -/
+#guard_msgs in
+example : Html Unit := <svg viewbox={"0 0 1 1"} />
+
+/-- error: unknown event attribute `onclik` -/
+#guard_msgs in
+example : Html Unit := <circle onclik={()} />
+
+/-- error: `title` in SVG can't have child elements, only text -/
+#guard_msgs in
+example : Html Unit := <svg><title><circle /></title></svg>
+
+/-- error: unknown element `circle` -/
+#guard_msgs in
+example : Html Unit := <foreignObject><circle /></foreignObject>
+
+-- These are all accepted.
+example : Html Unit :=
+  <svg xmlns="http://www.w3.org/2000/svg" role="img" aria-label="a" data-x="1" class="c" style="d">
+    <circle cx={1} transform-origin="center" onclick={()} use={fun _ => pure (pure ())} />
+  </svg>
 
 /-- info: "<div><p>a</p></div>" -/
 #guard_msgs in

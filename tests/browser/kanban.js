@@ -17,6 +17,18 @@ await withExample("kanban", async (page) => {
   assert.deepEqual(await titles(0), ["Write the release notes", "Fix the flaky upload test"]);
   assert.ok(await undo.isDisabled(), "there's nothing to undo at first");
 
+  // The chart is SVG that the browser lays out, including bars from their own markup.
+  const bars = page.locator(".chart rect");
+  const barTitle = (i) => bars.nth(i).locator("title").textContent();
+  const barHeight = (i) => bars.nth(i).evaluate((el) => el.getBBox().height);
+  assert.equal(await bars.count(), 3);
+  assert.equal(
+    await bars.first().evaluate((el) => el.namespaceURI),
+    "http://www.w3.org/2000/svg",
+  );
+  assert.equal(await barTitle(0), "To do: 2");
+  assert.ok((await barHeight(0)) > 0, "the bar is laid out");
+
   // Adding cards. The input keeps the focus however the card is added.
   await columnAt(0).locator(".add-card").click();
   const newCard = columnAt(0).locator(".new-card input");
@@ -36,6 +48,7 @@ await withExample("kanban", async (page) => {
   assert.ok(await card("First").getByLabel("Move left").isDisabled());
   await card("First").getByLabel("Move right").click();
   assert.deepEqual(await titles(1), ["Add dark mode", "First"]);
+  assert.equal(await barTitle(1), "Doing: 2", "the chart follows the board");
 
   // Dragging a card onto another, and into the empty part of a column.
   const draggedNode = await card("Second").elementHandle();

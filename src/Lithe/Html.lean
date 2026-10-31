@@ -107,6 +107,8 @@ structure Template where
   paths : Array (Array Nat)
   /-- Identifies the template: two templates with the same key are interchangeable. -/
   key : String
+  /-- Whether the root is an SVG element that the HTML parser only recognizes inside of `svg`. -/
+  svg : Bool := false
   deriving Inhabited
 
 mutual
@@ -117,7 +119,10 @@ inductive Html (Msg : Type) where
   | empty
   /-- A text node. -/
   | text (s : String)
-  /-- An element built at run time, for trees that aren't known at compile time. -/
+  /--
+  An element built at run time, for trees that aren't known at compile time. It's in the SVG
+  namespace if its tag is `svg`, or if its parent is an SVG element other than `foreignObject`.
+  -/
   | elem (tag : String) (attrs : Array (Attr Msg)) (children : Array (Html Msg))
   /-- A list whose items keep their DOM nodes and state as they move, identified by unique keys. -/
   | keyed (items : Array (String × Html Msg))

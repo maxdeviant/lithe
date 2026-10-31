@@ -49,6 +49,12 @@ h1 {
   padding: 0.5rem;
 }
 
+.chart {
+  width: 64px;
+  height: 24px;
+  fill: currentColor;
+}
+
 #board {
   align-items: flex-start;
   display: flex;

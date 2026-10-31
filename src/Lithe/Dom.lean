@@ -24,13 +24,20 @@ namespace Raw
 @[extern js inline "document.createTextNode(#1.toString())"]
 opaque createText (s : @& String) : BaseIO JsValue
 
-@[extern js inline "document.createElement(#1.toString())"]
-opaque createElement (tag : @& String) : BaseIO JsValue
+/-- Creates an element to go in `parent`, in the SVG namespace if that's what `parent` leads to. -/
+@[extern js inline
+  "((parent, tag) => { const svg = 'http://www.w3.org/2000/svg'; return tag === 'svg' || (parent.namespaceURI === svg && parent.localName !== 'foreignObject') ? document.createElementNS(svg, tag) : document.createElement(tag); })(#1, #2.toString())"]
+opaque createElementIn (parent : @& JsValue) (tag : @& String) : BaseIO JsValue
 
 /-- Parses `html` as a template, and returns its root element. -/
 @[extern js inline
   "(() => { const t = document.createElement('template'); t.innerHTML = #1.toString(); return t.content.firstChild; })()"]
 opaque parseTemplate (html : @& String) : BaseIO JsValue
+
+/-- Parses `html` as a template whose root element is only recognized inside of `svg`. -/
+@[extern js inline
+  "(() => { const t = document.createElement('template'); t.innerHTML = `<svg>${#1.toString()}</svg>`; return t.content.firstChild.firstChild; })()"]
+opaque parseSvgTemplate (html : @& String) : BaseIO JsValue
 
 @[extern js inline "#1.cloneNode(true)"]
 opaque clone (node : @& JsValue) : BaseIO JsValue
@@ -107,7 +114,8 @@ opaque eventTimeStamp (e : @& JsValue) : BaseIO Float
 @[extern js inline "#1[#2.toString()] === true ? 1 : 0"]
 opaque eventFlag (e : @& JsValue) (name : @& String) : BaseIO Bool
 
-@[extern js inline "$rt.mkString(String(#1.target?.tagName ?? ''))"]
+-- SVG elements keep the case of their tag names, unlike HTML elements.
+@[extern js inline "$rt.mkString(String(#1.target?.tagName ?? '').toUpperCase())"]
 opaque eventTargetTag (e : @& JsValue) : BaseIO String
 
 @[extern js inline "(#1.preventDefault(), 0)"]
@@ -332,7 +340,7 @@ def slotOf (el : JsValue) : IO Nat := do
 def templateRoot (t : Template) : IO JsValue := do
   if let some root := (← rt.templates.get)[t.key]? then
     return root
-  let root ← Raw.parseTemplate t.html
+  let root ← if t.svg then Raw.parseSvgTemplate t.html else Raw.parseTemplate t.html
   rt.templates.modify (·.insert t.key root)
   return root
 
@@ -485,7 +493,7 @@ partial def mount (parent ref : JsValue) : Html Msg → IO (Mounted Msg)
     Raw.insertBefore parent node ref
     return .text node s
   | .elem tag attrs children => do
-    let node ← Raw.createElement tag
+    let node ← Raw.createElementIn parent tag
     let children ← children.mapM (mount node .null)
     -- Content comes first, so that `value` on a `select` is set after its options exist.
     let attrs ← attrs.mapM (rt.mountAttr node)

@@ -47,6 +47,14 @@ Elements compile to a `Template`, which holds static HTML and the path to each h
 
 **`value` on `select` and `textarea` only works in a hole.** They have the property but not the attribute, so a static `value` is an error rather than being silently ignored.
 
+**SVG** is markup that the macro follows into a different set of rules, from the moment it sees `svg`:
+
+- Tags and attributes are checked against tables for SVG, in which case matters, so `viewBox` passes and `viewbox` doesn't. The HTML parser corrects the case of what it reads, but holes use `setAttribute`, and only the table stops a wrong name from having no effect there. Names with a colon, such as `xlink:href`, can't be parsed, so use `href`.
+- HTML isn't allowed directly in SVG, as tags such as `div` make the parser leave SVG altogether. Inside `foreignObject` the content is HTML again, and most of the parser's restructuring stops at that element, so `div` in `foreignObject` in `p` is fine. `a` and `form` are the exceptions, as the parser finds those anywhere.
+- `/>` really does close elements in SVG, but it's still written out as a closing tag, so that there is one form to emit. Void elements and raw text don't apply, except that `title`, `desc`, `style`, and `script` only take text and holes.
+
+**Markup whose root is only an SVG element**, such as a `rect` in a helper function, is parsed inside a temporary `svg`, as otherwise the parser would make an unknown HTML element. That's what `Template.svg` is for. It's decided by the tag, so a root that is also HTML (`a`, `title`, `style`, or `script`) stays HTML, and has no effect in SVG. Wrap it in `<g>` for the SVG one. As with HTML, what goes in a hole isn't checked against what's around it, so nothing catches this at compile time. `Html.elem` has no such problem, as it creates its element knowing the parent. `math` is still rejected, as it would need the same work.
+
 **`class` has no directive.** Svelte now advises against `class:`, so `class` takes a value like any other attribute: `class={#["row", cls "done" t.done]}`.
 
 ### Parsing traps
@@ -131,6 +139,4 @@ Ideas to try if the numbers become a problem, in rough order of expected value:
 
 ## Not in the first version
 
-Server rendering and hydration, `component` syntax, scoped CSS, transitions, SVG, and hot reload that preserves state. A patcher proof is also out, with randomized tests in `tests/dom/Random.lean` standing in for it.
-
-SVG needs skeletons parsed with the right namespace, and a way to create elements in that namespace for `Html.elem`.
+Server rendering and hydration, `component` syntax, scoped CSS, transitions, MathML, and hot reload that preserves state. A patcher proof is also out, with randomized tests in `tests/dom/Random.lean` standing in for it.

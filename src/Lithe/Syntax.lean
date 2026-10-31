@@ -142,6 +142,15 @@ scoped syntax:50 term:51 afterLinebreak
 /-- The attributes that aren't in the standards data but that every element accepts. -/
 def ariaAttributes : List String := ["role"]
 
+/-- The attributes that aren't in the SVG standards data but that SVG elements accept. -/
+def svgExtraAttributes : List String := ["transform-origin", "xmlns"]
+
+/-- The SVG elements whose content the HTML parser reads as HTML, so that only text belongs there. -/
+def svgTextElements : List String := ["desc", "script", "style", "title"]
+
+/-- The elements that the HTML parser closes when nesting another, even from inside of SVG. -/
+def unscopedExclusions : List String := ["a", "form"]
+
 /-- The elements whose content the HTML parser doesn't treat as markup. -/
 def rawTextElements : List String := ["script", "style", "textarea", "title"]
 
@@ -180,14 +189,13 @@ def allowedChildren : List (String × List String) :=
     ("select", ["option", "optgroup", "hr"]),
     ("optgroup", ["option"])]
 
-/-- The elements that only make sense in a place that templates can't reach, or need namespaces. -/
+/-- The elements that only make sense in a place that templates can't reach, or need a namespace. -/
 def unsupportedElements : List (String × String) :=
   [("html", "it is outside of what an app renders"),
     ("head", "it is outside of what an app renders"),
     ("body", "it is outside of what an app renders"),
     ("frameset", "it is outside of what an app renders"),
     ("template", "its content is inert, so holes can't reach it"),
-    ("svg", "SVG isn't supported yet"),
     ("math", "MathML isn't supported yet")]
 
 /-- Returns the text of a name. -/
@@ -196,6 +204,13 @@ def nameText (n : Syntax) : String := n[0].getAtomVal
 /-- Returns whether `tag` is the name of a custom element, which may have any attributes. -/
 def isCustomElement (tag : String) : Bool :=
   tag.contains '-'
+
+/--
+Returns whether the root element `tag` can only be SVG. The HTML parser would turn `image` into `img`,
+and so it counts as SVG. Tags that are also HTML, such as `a`, are HTML here, as nothing says otherwise.
+-/
+def isSvgFragment (tag : String) : Bool :=
+  HtmlData.svgTagNames.contains tag && (tag == "image" || !HtmlData.tagNames.contains tag)
 
 /-- The state of compiling markup. -/
 structure State where
@@ -212,9 +227,9 @@ abbrev CompileM := StateT State MacroM
 def emit (s : String) : CompileM Unit :=
   modify fun st => { st with html := st.html ++ s }
 
-/-- Checks that the attribute `name` is valid on the element `tag`. -/
-def checkAttr (tag : String) (ref : Syntax) (name : String) : CompileM Unit := do
-  if isCustomElement tag then
+/-- Checks that the attribute `name` is valid on the element `tag`, which is SVG if `svg`. -/
+def checkAttr (tag : String) (svg : Bool) (ref : Syntax) (name : String) : CompileM Unit := do
+  if !svg && isCustomElement tag then
     return
   if name.startsWith "data-" || name.startsWith "aria-" then
     return
@@ -222,47 +237,52 @@ def checkAttr (tag : String) (ref : Syntax) (name : String) : CompileM Unit := d
     unless HtmlData.eventAttributes.contains name do
       Macro.throwErrorAt ref s!"unknown event attribute `{name}`"
     return
-  let specific := (HtmlData.elementAttributes.lookup tag).getD []
-  unless HtmlData.globalAttributes.contains name || ariaAttributes.contains name
-      || specific.contains name do
+  let isKnown :=
+    if svg then
+      HtmlData.svgGlobalAttributes.contains name || svgExtraAttributes.contains name
+        || ((HtmlData.svgElementAttributes.lookup tag).getD []).contains name
+    else
+      HtmlData.globalAttributes.contains name
+        || ((HtmlData.elementAttributes.lookup tag).getD []).contains name
+  unless isKnown || ariaAttributes.contains name do
     Macro.throwErrorAt ref s!"`{tag}` has no attribute `{name}`"
 
 /-- Adds the hole for the attribute `name` with the value `value`. -/
-def attrHole (tag : String) (ref : Syntax) (path : Array Nat) (name : String) (value : Term) :
-    CompileM Unit := do
+def attrHole (tag : String) (svg : Bool) (ref : Syntax) (path : Array Nat) (name : String)
+    (value : Term) : CompileM Unit := do
   -- Type class failures are reported at the code that the macro generates, not at `value`.
   let hole ← withRef value do
     let attr ← if name == "use" then
         `(Lithe.Attr.use $value)
       else if name.startsWith "on" && name.length > 2 then
-        checkAttr tag ref name
+        checkAttr tag svg ref name
         let event := Syntax.mkStrLit (name.drop 2).toString
         `(Lithe.Attr.on $event (Lithe.ToHandler.toHandler $value))
       else
         -- These have a `value` property but no such attribute, and holes set live properties.
         unless name == "value" && (tag == "select" || tag == "textarea") do
-          checkAttr tag ref name
+          checkAttr tag svg ref name
         `(Lithe.Attr.value $(Syntax.mkStrLit name) (Lithe.ToAttrValue.toAttrValue $value))
     `(Lithe.Hole.attr $attr)
   modify fun st => { st with attrHoles := st.attrHoles.push (hole, path) }
 
 /-- Compiles an attribute of the element `tag` at `path`. -/
-def compileAttr (tag : String) (path : Array Nat) (attr : Syntax) : CompileM Unit := do
+def compileAttr (tag : String) (svg : Bool) (path : Array Nat) (attr : Syntax) : CompileM Unit := do
   if attr.isOfKind ``attrStr then
     let name := nameText attr[0]
     if name == "use" || name.startsWith "on" then
       Macro.throwErrorAt attr[0] s!"`{name}` needs a value in braces, not a string"
-    checkAttr tag attr[0] name
+    checkAttr tag svg attr[0] name
     let some value := attr[2].isStrLit? | Macro.throwUnsupported
     emit s!" {name}=\"{value.replace "\"" "&quot;"}\""
   else if attr.isOfKind ``attrTerm then
-    attrHole tag attr[0] path (nameText attr[0]) ⟨attr[3]⟩
+    attrHole tag svg attr[0] path (nameText attr[0]) ⟨attr[3]⟩
   else if attr.isOfKind ``attrBare then
     let name := nameText attr[0]
-    checkAttr tag attr[0] name
+    checkAttr tag svg attr[0] name
     emit s!" {name}"
   else if attr.isOfKind ``attrShort then
-    attrHole tag attr[1] path attr[1].getId.toString ⟨attr[1]⟩
+    attrHole tag svg attr[1] path attr[1].getId.toString ⟨attr[1]⟩
   else
     Macro.throwUnsupported
 
@@ -285,6 +305,14 @@ def checkNesting (ref : Syntax) (tag : String) (ancestors : List String) : Compi
     Macro.throwErrorAt ref s!"`{tag}` can't be a child of `{parent}`, as the HTML parser would close it"
   if rawTextElements.contains parent then
     Macro.throwErrorAt ref s!"`{parent}` can't have child elements, as its content is plain text"
+
+/--
+Checks that `tag` is an SVG element. This also covers what the HTML parser would restructure, as the
+elements that make it leave SVG, such as `div`, aren't SVG elements.
+-/
+def checkSvgElement (ref : Syntax) (tag : String) : CompileM Unit := do
+  unless HtmlData.svgTagNames.contains tag do
+    Macro.throwErrorAt ref s!"`{tag}` isn't an SVG element, so HTML has to go in `foreignObject`"
 
 /--
 Removes whitespace that only lays out the markup: any at either end that contains a newline, as in
@@ -319,15 +347,22 @@ def removeComments (children : Array Syntax) : CompileM (Array Syntax) :=
 
 mutual
 
-/-- Compiles the element `el` at `path`, whose parent is the head of `ancestors`. -/
-partial def compileElement (el : Syntax) (path : Array Nat) (ancestors : List String) :
-    CompileM Unit := do
+/--
+Compiles the element `el` at `path`, whose parent is the head of `ancestors` unless `inSvg`, which
+says that its parent is SVG. In that case, `ancestors` has only the HTML elements around the SVG.
+-/
+partial def compileElement (el : Syntax) (path : Array Nat) (ancestors : List String)
+    (inSvg : Bool) : CompileM Unit := do
   let tag := nameText el[1]
-  checkNesting el[1] tag ancestors
+  if inSvg then
+    checkSvgElement el[1] tag
+  else
+    checkNesting el[1] tag ancestors
+  let svg := inSvg || tag == "svg"
   emit s!"<{tag}"
   for attr in el[2].getArgs do
-    compileAttr tag path attr
-  let isVoid := HtmlData.voidElements.contains tag
+    compileAttr tag svg path attr
+  let isVoid := !svg && HtmlData.voidElements.contains tag
   if el.isOfKind ``elementSelfClosed then
     -- The HTML parser ignores `/>`, so an element that isn't void would swallow what follows it.
     emit (if isVoid then ">" else s!"></{tag}>")
@@ -339,15 +374,26 @@ partial def compileElement (el : Syntax) (path : Array Nat) (ancestors : List St
   emit ">"
   if newlineDroppingElements.contains tag then
     emit "\n"
+  -- What's in `foreignObject` is HTML again, in which most of the parser's rules stop at this element.
+  let (childAncestors, childSvg) :=
+    if tag == "foreignObject" && svg then
+      (ancestors.filter unscopedExclusions.contains, false)
+    else if svg then
+      (ancestors, true)
+    else
+      (tag :: ancestors, false)
   let mut index := 0
   for child in ← removeComments el[4].getArgs do
-    if ← compileChild child (path.push index) tag (tag :: ancestors) then
+    if ← compileChild child (path.push index) tag childAncestors childSvg then
       index := index + 1
   emit s!"</{tag}>"
 
-/-- Compiles a child at `path` of the element `parent`, returning whether it added a DOM node. -/
+/--
+Compiles a child at `path` of the element `parent`, which is SVG if `inSvg`, returning whether it
+added a DOM node.
+-/
 partial def compileChild (child : Syntax) (path : Array Nat) (parent : String)
-    (ancestors : List String) : CompileM Bool := do
+    (ancestors : List String) (inSvg : Bool) : CompileM Bool := do
   if child.isOfKind `Lithe.markupText then
     let raw := child[0].getAtomVal
     let text := if preformattedElements.contains parent then raw else normalizeText raw
@@ -358,7 +404,8 @@ partial def compileChild (child : Syntax) (path : Array Nat) (parent : String)
     emit text
     return true
   else if child.isOfKind ``childHole then
-    if rawTextElements.contains parent then
+    -- The HTML parser only treats these as plain text outside of SVG.
+    if !inSvg && rawTextElements.contains parent then
       Macro.throwErrorAt child
         s!"`{parent}` can't have a child hole, as its content is plain text"
     let value : Term := ⟨child[1]⟩
@@ -368,7 +415,9 @@ partial def compileChild (child : Syntax) (path : Array Nat) (parent : String)
     emit "<!>"
     return true
   else if child.isOfKind ``childElement then
-    compileElement child[0] path ancestors
+    if inSvg && svgTextElements.contains parent then
+      Macro.throwErrorAt child s!"`{parent}` in SVG can't have child elements, only text"
+    compileElement child[0] path ancestors inSvg
     return true
   else
     Macro.throwUnsupported
@@ -377,7 +426,8 @@ end
 
 /-- Expands markup to a `Lithe.Html.template`. -/
 @[macro markup] def expandMarkup : Macro := fun stx => do
-  let ((), st) ← (compileElement stx[0] #[] []).run {}
+  let svg := isSvgFragment (nameText stx[0][1])
+  let ((), st) ← (compileElement stx[0] #[] [] svg).run {}
   -- Content comes first, so that `value` on a `select` is set after its options exist.
   let holes := st.childHoles ++ st.attrHoles
   let terms := holes.map (·.1)
@@ -386,7 +436,7 @@ end
     `(#[$indices,*])
   let key := s!"{st.html}\x00{holes.map (·.2)}"
   `(Lithe.Html.template
-      (Lithe.Template.mk $(Syntax.mkStrLit st.html) #[$paths,*] $(Syntax.mkStrLit key))
+      (Lithe.Template.mk $(Syntax.mkStrLit st.html) #[$paths,*] $(Syntax.mkStrLit key) $(quote svg))
       #[$terms,*])
 
 end Lithe
