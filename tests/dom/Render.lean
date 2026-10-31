@@ -6,6 +6,7 @@ open Lithe LitheTest
 
 def views : Array (String × Html Unit) := #[
   ("text and entities", <p title="&amp;é" id={"\"<>&"}>&nbsp;é{"<b>&amp;"}é<b>{(1 : Nat)}</b>{"x"}</p>),
+  ("carriage returns", <p title={"a\r\nb\rc"}>{"a\r\nb\rc"}</p>),
   ("empty holes", <div hidden={false}>{(none : Option String)}{""}<br />{Html.empty}</div>),
   ("keyed lists", <ul>{Html.forEach #[(1 : Nat), 2] id fun n => <li>{n}</li>}</ul>),
   ("inputs",

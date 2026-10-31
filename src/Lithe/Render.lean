@@ -26,7 +26,8 @@ def newlineDroppingElements : List String := ["listing", "pre", "textarea"]
 
 /-- Returns `s` with what's significant in HTML text replaced by entities. -/
 def escapeText (s : String) : String :=
-  (((s.replace "&" "&amp;").replace "<" "&lt;").replace ">" "&gt;")
+  -- The parser turns a carriage return into a newline, unless it's a character reference.
+  (((((s.replace "&" "&amp;").replace "<" "&lt;").replace ">" "&gt;")).replace "\r" "&#13;")
 
 /-- Returns `s` with what's significant in a quoted attribute value replaced by entities. -/
 def escapeAttr (s : String) : String :=
