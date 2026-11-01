@@ -2,5 +2,5 @@ packages:
   - examples/*
   - bench
 minimumReleaseAgeExclude:
-  - '@leanscript/runtime@0.2.0'
-  - '@leanscript/vite-plugin@0.2.0'
+  - '@leanscript/runtime@0.3.0'
+  - '@leanscript/vite-plugin@0.3.0'

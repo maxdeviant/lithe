@@ -9,7 +9,7 @@
     "bench": "node bench/run.js"
   },
   "devDependencies": {
-    "@leanscript/runtime": "0.2.0",
+    "@leanscript/runtime": "0.3.0",
     "html-element-attributes": "^3.5.0",
     "html-event-attributes": "^2.2.0",
     "html-tag-names": "^2.1.0",
