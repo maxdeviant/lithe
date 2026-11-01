@@ -1,0 +1,12 @@
+name = "static"
+
+[[require]]
+name = "lithe"
+path = "../.."
+
+[[lean_lib]]
+name = "Islands"
+
+[[lean_exe]]
+name = "site"
+root = "Site"

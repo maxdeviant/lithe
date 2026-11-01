@@ -26,7 +26,7 @@ Message types are unconstrained, so `Html (Model → Model)` works too. `App.sim
 
 Lithe has two targets. `Lithe` is for LeanScript, and `Lithe.Core` is for code that both targets compile, such as the view of a page that a native server renders and a client then runs.
 
-**What breaks only shows up when linking.** `@[extern js inline]` compiles to a call to a symbol that nothing defines in a native program, so `#eval` and building oleans both work, and `import Lithe` fails later with undefined symbols from `Js.Value`. So `tests/LitheNativeTest.lean` is a native program, which `pnpm test` links and runs, and `examples/server` is another.
+**What breaks only shows up when linking.** `@[extern js inline]` compiles to a call to a symbol that nothing defines in a native program, so `#eval` and building oleans both work, and `import Lithe` fails later with undefined symbols from `Js.Value`. So `tests/LitheNativeTest.lean` is a native program, which `pnpm test` links and runs, and `examples/server` and `examples/static` are others.
 
 **An extern that a view needs has a native side as well**, as in `@[extern c inline "lean_io_result_mk_ok(lean_box(0))" js inline "..."]`. LeanScript takes the `js` entry and native Lean takes the `c` one. `ElementHandle.focus` does this so that `Action.focus` is in `Lithe.Core`. It does nothing, as nothing runs actions natively.
 
