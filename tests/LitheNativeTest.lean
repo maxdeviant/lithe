@@ -24,6 +24,20 @@ def view (count : Nat) : Html Msg :=
     {Html.forEach #["x"] id fun s => <span>é{s}</span>}
   </main>
 
+/-- A page with the kinds of things that a static site has, around a part that a client takes over. -/
+def page (name : String) : Document Unit :=
+  <html lang="en">
+    <head>
+      <meta property="og:title" content={name} />
+      <title>{name} · {(1 : Nat)}</title>
+      {Html.inlineScript "a = '</b>'"}
+    </head>
+    <body>
+      <div id="app">{Html.static (view 3)}</div>
+      {Html.jsonScript "data" "</script>"}
+    </body>
+  </html>
+
 /-- Returns whether `actual` is `expected`, printing both if not. -/
 def check (name actual expected : String) : IO Bool := do
   if actual == expected then
@@ -49,6 +63,11 @@ public def main : IO UInt32 := do
       "<svg viewBox=\"0 0 1 1\"><rect width=\"3\"></rect></svg>" ++
       "<select><option value=\"a\">A</option><option value=\"b\" selected>B</option></select>" ++
       "<span>éx</span></main>")
+  let document ← check "a document" (page "<x>").render
+    ("<!doctype html><html lang=\"en\"><head><meta property=\"og:title\" content=\"&lt;x&gt;\">" ++
+      "<title>&lt;x&gt; · 1</title><script>a = '<\\/b>'</script></head><body><div id=\"app\">" ++
+      (view 3).render ++ "</div><script id=\"data\" type=\"application/json\">\"\\u003c/script>\"</script>" ++
+      "</body></html>")
   let described ← check "effects and subscriptions" describe "2 #[s]"
   -- The native side of this extern is otherwise never run.
   let cleanup ← Action.focus fakeHandle
@@ -57,4 +76,4 @@ public def main : IO UInt32 := do
     IO.eprintln s!"FAIL JSON: {failure}"
   for line in LitheTest.JsonCases.transcript do
     IO.println s!"json {line}"
-  return if rendered && described && LitheTest.JsonCases.failures.isEmpty then 0 else 1
+  return if rendered && document && described && LitheTest.JsonCases.failures.isEmpty then 0 else 1

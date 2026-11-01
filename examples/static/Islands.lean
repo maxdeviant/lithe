@@ -62,8 +62,7 @@ def view (m : Model) : Html Msg :=
       hidden={!m.live} value={m.query} oninput={Msg.search} />
     <p id="filter-count">{terms.size} of {m.terms.size} terms</p>
     <dl>
-      {Html.keyed <| terms.map fun term =>
-        (term.name, <div><dt>{term.name}</dt><dd>{term.definition}</dd></div>)}
+      {Html.forEach terms (·.name) fun term => <div><dt>{term.name}</dt><dd>{term.definition}</dd></div>}
     </dl>
   </div>
 

@@ -22,38 +22,27 @@ def applySavedTheme : String := "try {
   }
 } catch {}"
 
-/-- Returns the element with the ID `id` that holds `view`, whose messages only matter to a client. -/
-def island (id : String) (view : Html Msg) : Html Unit :=
-  .elem "div" #[.value "id" (.str id)] #[view.map fun _ => ()]
-
-/-- Returns a `script` element with `attrs` and the content `text`, which markup can't have a hole for. -/
-def scriptWith (attrs : Array (Attr Unit)) (text : String) : Html Unit :=
-  .elem "script" attrs #[.text text]
-
-/--
-Returns the document for a page, which loads the client from `client`. Markup can't have `html`,
-`head`, or `body`, as an app doesn't render those, or a hole in `title`, so they're built directly.
--/
-def document (client pageTitle : String) (content : Html Unit) : String :=
-  let html : Html Unit := .elem "html" #[.value "lang" (.str "en")] #[
-    .elem "head" #[] #[
-      <meta charset="utf-8" />,
-      <meta name="viewport" content="width=device-width, initial-scale=1" />,
-      .elem "title" #[] #[.text pageTitle],
-      <link rel="icon" href="data:," />,
-      <link rel="stylesheet" href="/style.css" />,
-      scriptWith #[] applySavedTheme,
+/-- Returns the document for a page, which loads the client from `client`. -/
+def document (client pageTitle : String) (content : Html Unit) : Document Unit :=
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <meta property="og:title" content={pageTitle} />
+      <title>{pageTitle}</title>
+      <link rel="icon" href="data:," />
+      <link rel="stylesheet" href="/style.css" />
+      {Html.inlineScript applySavedTheme}
       <script type="module" src={client}></script>
-    ],
-    .elem "body" #[] #[
+    </head>
+    <body>
       <header>
         <nav><a href="/">Home</a> <a href="/glossary/">Glossary</a></nav>
-        {island "theme" (Theme.view none)}
-      </header>,
+        <div id="theme">{Html.static (Theme.view none)}</div>
+      </header>
       <main>{content}</main>
-    ]
-  ];
-  s!"<!doctype html>{html.render}\n"
+    </body>
+  </html>
 
 def home : Html Unit :=
   <section>
@@ -64,8 +53,8 @@ def home : Html Unit :=
 def glossary : Html Unit :=
   <section>
     <h1>Glossary</h1>
-    {island "glossary" (Filter.view { terms })}
-    {scriptWith #[.value "id" (.str "terms"), .value "type" (.str "application/json")] (Json.encode terms)}
+    <div id="glossary">{Html.static (Filter.view { terms })}</div>
+    {Html.jsonScript "terms" terms}
   </section>
 
 /-- Returns the path of the client's script in Vite's manifest, `manifest`. -/
@@ -85,5 +74,5 @@ def writePage (path : System.FilePath) (content : String) : IO Unit := do
 public def main : IO Unit := do
   let dist : System.FilePath := "dist"
   let client ← IO.ofExcept (clientPath (← IO.FS.readFile (dist / ".vite" / "manifest.json")))
-  writePage (dist / "index.html") (document client "A static site" home)
-  writePage (dist / "glossary" / "index.html") (document client "Glossary & terms" glossary)
+  writePage (dist / "index.html") (document client "A static site" home).render
+  writePage (dist / "glossary" / "index.html") (document client "Glossary & terms" glossary).render

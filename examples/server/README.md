@@ -12,7 +12,7 @@ A counter whose page comes from a native Lean server, and that LeanScript then m
 
 **The client adopts the page rather than replacing it.** `hydrateById` keeps every node that the server sent, and adds the handlers and actions that HTML can't have, so nothing flickers and nothing loses its state.
 
-**The state comes from the server.** Try <http://localhost:3000/?count=5>. `jsonScript` puts the model in the page as JSON, and `readJsonScript?` reads it with `JSON.parse` and `FromJs`, which adds much less to the client than `Json.decode`. `Counter.lean` can't derive `FromJs`, as that needs JS, so `App.lean` does that with `deriving instance`.
+**The state comes from the server.** Try <http://localhost:3000/?count=5>. `Html.jsonScript` puts the model in the page as JSON, and `readJsonScript?` reads it with `JSON.parse` and `FromJs`, which adds much less to the client than `Json.decode`. `Counter.lean` can't derive `FromJs`, as that needs JS, so `App.lean` does that with `deriving instance`.
 
 **Actions are the part of a view that needs care.** Lean only links a native program if everything it refers to has a native implementation, so a shared view can use `Action.focus`, but an action of your own has to give its extern a native side too. It's never run there, as rendering leaves actions out:
 

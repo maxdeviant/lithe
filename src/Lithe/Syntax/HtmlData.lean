@@ -74,7 +74,7 @@ def elementAttributes : List (String × List String) := [
   ("link", ["as", "blocking", "charset", "color", "crossorigin", "disabled", "fetchpriority", "href", "hreflang", "imagesizes", "imagesrcset", "integrity", "media", "referrerpolicy", "rel", "rev", "sizes", "target", "type"]),
   ("map", ["name"]),
   ("menu", ["compact"]),
-  ("meta", ["charset", "content", "http-equiv", "media", "name", "scheme"]),
+  ("meta", ["charset", "content", "http-equiv", "media", "name", "property", "scheme"]),
   ("meter", ["high", "low", "max", "min", "optimum", "value"]),
   ("object", ["align", "archive", "border", "classid", "codebase", "codetype", "data", "declare", "form", "height", "hspace", "name", "standby", "type", "typemustmatch", "usemap", "vspace", "width"]),
   ("ol", ["compact", "reversed", "start", "type"]),

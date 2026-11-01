@@ -150,6 +150,97 @@ example : Html Unit := <div class="a" class={"b"} />
 -- More than one action is fine.
 example : Html Unit := <div use={fun _ => pure (pure ())} use={fun _ => pure (pure ())} />
 
+/-- error: `script` can't have a child hole, as what's in it would run, so use `Html.jsonScript` for data and `Html.inlineScript` for code you trust -/
+#guard_msgs in
+example : Html Unit := <script>{"a"}</script>
+
+-- A `title` with a hole is a hole of its parent, as a template can't have a hole in it.
+/-- info: "<div><!><p></p></div>" -/
+#guard_msgs in
+#eval htmlOf (<div><title>{"a"} b</title><p /></div>)
+
+/-- info: "<div><title>a &amp; b</title></div>" -/
+#guard_msgs in
+#eval htmlOf (<div><title>a &amp; b</title></div>)
+
+/-- info: "<title>[text(a ), text(<b>), text( ), text(1), text( )]" -/
+#guard_msgs in
+#eval (<title>a {"<b>"} {(1 : Nat)} {/- note -/}</title> : Html Unit).debug
+
+/-- error: `title` can't have attributes if it has a hole -/
+#guard_msgs in
+example : Html Unit := <title id="a">{"a"}</title>
+
+/-- error: `title` can't have `&` in its text if it has a hole, so write `{"&"}` instead -/
+#guard_msgs in
+example : Html Unit := <title>a &amp; {"b"}</title>
+
+/-- error: `title` can't have child elements, as its content is plain text -/
+#guard_msgs in
+example : Html Unit := <title>{"a"}<b>c</b></title>
+
+/--
+error: failed to synthesize instance of type class
+  ToString (Html Unit)
+
+Hint: Type class instance resolution failures can be inspected with the `set_option trace.Meta.synthInstance true` command.
+-/
+#guard_msgs in
+example : Html Unit := <title>{(.empty : Html Unit)}</title>
+
+/-- info: "<meta property=\"og:title\" content=\"a\">" -/
+#guard_msgs in
+#eval htmlOf (<meta property="og:title" content="a" />)
+
+/-- error: `div` has no attribute `property` -/
+#guard_msgs in
+example : Html Unit := <div property="a" />
+
+-- A document is one template, so its head and body have all that markup has.
+/-- info: "<html lang=\"en\"><head><meta charset=\"utf-8\"><!></head><body class=\"a\"><p>&amp;<!></p></body></html>" -/
+#guard_msgs in
+#eval match (
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <title>{"a"}</title>
+    </head>
+    <body class="a"><p>&amp;{"b"}</p></body>
+  </html> : Document Unit) with
+  | { root } => htmlOf root
+
+/-- error: `head` can't be used in markup: it is outside of what an app renders, so it can only be in `html` -/
+#guard_msgs in
+example : Html Unit := <head />
+
+/-- error: `body` can't be used in markup: it is outside of what an app renders, so it can only be in `html` -/
+#guard_msgs in
+example : Html Unit := <div><body /></div>
+
+/-- error: `html` can't be used in markup: it is outside of what an app renders, so it can only be the root of a document -/
+#guard_msgs in
+example : Html Unit := <div><html /></div>
+
+/-- error: `html` has to contain `head` and then `body`, and nothing else -/
+#guard_msgs in
+example : Document Unit := <html />
+
+/-- error: `html` has to contain `head` and then `body`, and nothing else -/
+#guard_msgs in
+example : Document Unit := <html><body /><head /></html>
+
+/-- error: `html` has to contain `head` and then `body`, and nothing else -/
+#guard_msgs in
+example : Document Unit := <html><head />{"a"}<body /></html>
+
+/-- error: `div` can't be a child of `head`, as the HTML parser would move it -/
+#guard_msgs in
+example : Document Unit := <html><head><div /></head><body /></html>
+
+/-- error: `head` can't contain text, as the HTML parser would move it -/
+#guard_msgs in
+example : Document Unit := <html><head>oops</head><body /></html>
+
 /-- error: `math` can't be used in markup: MathML isn't supported yet -/
 #guard_msgs in
 example : Html Unit := <math />

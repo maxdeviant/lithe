@@ -181,6 +181,36 @@ partial def Hole.map (f : α → β) : Hole α → Hole β
 
 end
 
+mutual
+
+/--
+Returns `h` without its handlers and actions, so that it sends no messages and fits in markup of any
+message type. It renders the same as `h`.
+-/
+partial def Html.static : Html α → Html β
+  | .empty => .empty
+  | .text s => .text s
+  | .elem tag attrs children =>
+    let attrs := attrs.filterMap fun
+      | .value name value => some (.value name value)
+      | .on .. | .use _ => none
+    .elem tag attrs (children.map Html.static)
+  | .keyed items => .keyed (items.map fun (k, h) => (k, h.static))
+  | .template t holes => .template t (holes.map Hole.static)
+
+/-- Returns `h` without a handler or an action, keeping the hole, as each one has its place. -/
+partial def Hole.static : Hole α → Hole β
+  | .child h => .child h.static
+  | .attr (.value name value) => .attr (.value name value)
+  | .attr (.on ..) | .attr (.use _) => .attr default
+
+end
+
+/-- A complete HTML page, which can only be rendered, as an app can't take over `html`. -/
+structure Document (Msg : Type) where
+  /-- The `html` element. -/
+  root : Html Msg
+
 namespace Html
 
 /-- Returns a keyed list of `view` applied to each of `xs`, identified by `key`. -/

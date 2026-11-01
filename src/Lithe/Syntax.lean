@@ -162,7 +162,7 @@ def preformattedElements : List String := ["pre", "textarea", "listing", "script
 
 /-- The elements in which the HTML parser moves any text elsewhere. -/
 def noTextElements : List String :=
-  ["table", "thead", "tbody", "tfoot", "tr", "colgroup", "select", "optgroup"]
+  ["table", "thead", "tbody", "tfoot", "tr", "colgroup", "select", "optgroup", "html", "head"]
 
 /-- The elements that end an open `p` element. -/
 def paragraphClosers : List String :=
@@ -187,13 +187,15 @@ def allowedChildren : List (String × List String) :=
     ("tr", ["td", "th", "script", "style"]),
     ("colgroup", ["col"]),
     ("select", ["option", "optgroup", "hr"]),
-    ("optgroup", ["option"])]
+    ("optgroup", ["option"]),
+    ("html", ["head", "body"]),
+    ("head", ["base", "link", "meta", "noscript", "script", "style", "title"])]
 
 /-- The elements that only make sense in a place that templates can't reach, or need a namespace. -/
 def unsupportedElements : List (String × String) :=
-  [("html", "it is outside of what an app renders"),
-    ("head", "it is outside of what an app renders"),
-    ("body", "it is outside of what an app renders"),
+  [("html", "it is outside of what an app renders, so it can only be the root of a document"),
+    ("head", "it is outside of what an app renders, so it can only be in `html`"),
+    ("body", "it is outside of what an app renders, so it can only be in `html`"),
     ("frameset", "it is outside of what an app renders"),
     ("template", "its content is inert, so holes can't reach it"),
     ("math", "MathML isn't supported yet")]
@@ -301,10 +303,17 @@ def compileAttr (tag : String) (svg : Bool) (path : Array Nat) (attr : Syntax) :
   else
     Macro.throwUnsupported
 
+/-- Returns whether `tag` is in the place that it has in a document, whose parents are `ancestors`. -/
+def isDocumentElement (tag : String) (ancestors : List String) : Bool :=
+  match tag, ancestors with
+  | "html", [] | "head", ["html"] | "body", ["html"] => true
+  | _, _ => false
+
 /-- Checks that the HTML parser wouldn't restructure `tag` as a child of `ancestors`. -/
 def checkNesting (ref : Syntax) (tag : String) (ancestors : List String) : CompileM Unit := do
   if let some reason := unsupportedElements.lookup tag then
-    Macro.throwErrorAt ref s!"`{tag}` can't be used in markup: {reason}"
+    unless isDocumentElement tag ancestors do
+      Macro.throwErrorAt ref s!"`{tag}` can't be used in markup: {reason}"
   unless HtmlData.tagNames.contains tag || isCustomElement tag do
     Macro.throwErrorAt ref s!"unknown element `{tag}`"
   if selfExcludingElements.contains tag && ancestors.contains tag then
@@ -386,6 +395,51 @@ def removeComments (children : Array Syntax) : CompileM (Array Syntax) :=
       return acc.push child
     | none => return acc.push child
 
+/-- Returns whether the HTML element `el` is a `title` with a hole, which a template can't have. -/
+def isTitleWithHole (el : Syntax) : Bool :=
+  nameText el[1] == "title" && el.isOfKind ``elementOpen && el[4].getArgs.any (·.isOfKind ``childHole)
+
+/--
+Returns a term for the `title` element `el`, built directly. Its text can't be HTML like the text in a
+template, as it's escaped when rendered. Its holes are converted to strings, as it only has text.
+-/
+def compileTitle (el : Syntax) : MacroM Term := do
+  if nameText el[6] != "title" then
+    Macro.throwErrorAt el[6] s!"closing tag `{nameText el[6]}` doesn't match `title`"
+  unless el[2].getArgs.isEmpty do
+    Macro.throwErrorAt el[2] "`title` can't have attributes if it has a hole"
+  let (children, _) ← (removeComments el[4].getArgs).run {}
+  let children ← children.mapM fun child => do
+    if child.isOfKind `Lithe.markupText then
+      let text := normalizeText child[0].getAtomVal
+      if text.contains '&' then
+        Macro.throwErrorAt child "`title` can't have `&` in its text if it has a hole, so write `{\"&\"}` instead"
+      `(Lithe.Html.text $(Syntax.mkStrLit text))
+    else if child.isOfKind ``childHole then
+      let value : Term := ⟨child[1]⟩
+      withRef value `(Lithe.Html.text (toString $value))
+    else
+      Macro.throwErrorAt child "`title` can't have child elements, as its content is plain text"
+  `(Lithe.Html.elem "title" #[] #[$children,*])
+
+/-- Adds a hole at `path` for the content `html`, which is in SVG if `inSvg`. -/
+def addChildHole (html : Term) (path : Array Nat) (inSvg : Bool) : CompileM Unit := do
+  let hole ← withRef html `(Lithe.Hole.child $html)
+  let site ← `(Lithe.Template.Site.child $(Syntax.mkNumLit (toString (← htmlSize))) $(quote inSvg))
+  modify fun st => { st with childHoles := st.childHoles.push (hole, path, site) }
+  emit "<!>"
+
+/-- Checks that the document `el` has a `head` and then a `body`, and nothing else. -/
+def checkDocument (el : Syntax) : CompileM Unit := do
+  if el.isOfKind ``elementOpen then
+    let children := (← removeComments el[4].getArgs).filter fun child =>
+      !child.isOfKind `Lithe.markupText || !child[0].getAtomVal.trimAscii.isEmpty
+    let tags := children.map fun child =>
+      if child.isOfKind ``childElement then nameText child[0][1] else ""
+    if tags == #["head", "body"] then
+      return
+  Macro.throwErrorAt el[1] "`html` has to contain `head` and then `body`, and nothing else"
+
 mutual
 
 /--
@@ -452,30 +506,41 @@ partial def compileChild (child : Syntax) (path : Array Nat) (parent : String)
     return true
   else if child.isOfKind ``childHole then
     -- The HTML parser only treats these as plain text outside of SVG.
+    if !inSvg && parent == "script" then
+      Macro.throwErrorAt child
+        "`script` can't have a child hole, as what's in it would run, so use `Html.jsonScript` for data and `Html.inlineScript` for code you trust"
     if !inSvg && rawTextElements.contains parent then
       Macro.throwErrorAt child
         s!"`{parent}` can't have a child hole, as its content is plain text"
     let value : Term := ⟨child[1]⟩
     -- Type class failures are reported at the code that the macro generates, not at `value`.
-    let hole ← withRef value `(Lithe.Hole.child (Lithe.ToChild.toChild $value))
-    let site ← `(Lithe.Template.Site.child $(Syntax.mkNumLit (toString (← htmlSize))) $(quote inSvg))
-    modify fun st => { st with childHoles := st.childHoles.push (hole, path, site) }
-    emit "<!>"
+    addChildHole (← withRef value `(Lithe.ToChild.toChild $value)) path inSvg
     return true
   else if child.isOfKind ``childElement then
     if inSvg && svgTextElements.contains parent then
       Macro.throwErrorAt child s!"`{parent}` in SVG can't have child elements, only text"
-    compileElement child[0] path ancestors inSvg
+    if !inSvg && isTitleWithHole child[0] then
+      checkNesting child[0][1] "title" ancestors
+      addChildHole (← compileTitle child[0]) path inSvg
+    else
+      compileElement child[0] path ancestors inSvg
     return true
   else
     Macro.throwUnsupported
 
 end
 
-/-- Expands markup to a `Lithe.Html.template`. -/
+/-- Expands markup to a `Lithe.Html.template`, or a `Lithe.Document` if its root is `html`. -/
 @[macro markup] def expandMarkup : Macro := fun stx => do
-  let svg := isSvgFragment (nameText stx[0][1])
-  let ((), st) ← (compileElement stx[0] #[] [] svg).run {}
+  let tag := nameText stx[0][1]
+  if isTitleWithHole stx[0] then
+    return ← compileTitle stx[0]
+  let svg := isSvgFragment tag
+  let isDocument := tag == "html"
+  let ((), st) ← (do
+    if isDocument then
+      checkDocument stx[0]
+    compileElement stx[0] #[] [] svg).run {}
   -- Content comes first, so that `value` on a `select` is set after its options exist.
   let holes := st.childHoles.map (fun (term, path, _) => (term, path))
     ++ st.attrHoles.map fun h => (h.term, h.path)
@@ -493,9 +558,13 @@ end
       `(Lithe.Template.Site.attr $(num h.tagEnd))
   let sites := st.childHoles.map (·.2.2) ++ attrSites
   let key := s!"{st.html}\x00{holes.map (·.2)}"
-  `(Lithe.Html.template
+  let html ← `(Lithe.Html.template
       (Lithe.Template.mk $(Syntax.mkStrLit st.html) #[$paths,*] $(Syntax.mkStrLit key) $(quote svg)
         #[$sites,*])
       #[$terms,*])
+  if isDocument then
+    `(Lithe.Document.mk $html)
+  else
+    return html
 
 end Lithe

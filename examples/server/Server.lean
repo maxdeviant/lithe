@@ -17,7 +17,7 @@ def contentType : Option String → String
 /-- Returns `template` with the page for `model` in its element for the app, and `model` after it. -/
 def renderPage (template : String) (model : Model) : String :=
   template.replace "<div id=\"app\"></div>"
-    s!"<div id=\"app\">{(view model).render}</div>{jsonScript "model" model}"
+    s!"<div id=\"app\">{(view model).render}</div>{(Html.jsonScript "model" model : Html Msg).render}"
 
 /-- Returns the count that the query of a request asks for, as in `?count=5`. -/
 def countOf (query : String) : Nat :=

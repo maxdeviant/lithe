@@ -268,7 +268,7 @@ def hydrateRoot (root : JsValue) (h : Html Msg) : IO (Mounted Msg × Bool) := do
 end Runtime
 
 /--
-Returns the value in the element that `jsonScript` wrote with the ID `id`, or `none` if there's no
+Returns the value in the element that `Html.jsonScript` wrote with the ID `id`, or `none` if there's no
 such element, and throws an error if its content can't be read as that type.
 -/
 def readJsonScript? [FromJs α] (id : String) : IO (Option α) := do

@@ -171,6 +171,10 @@ def randomDescriptions : IO Unit := do
   checkEq "adopted pages patch like mounted ones" patchFailures 0
 
 def wrongPages : IO Unit := do
+  let titled : Html Nat := <div><title>a {"<b>"} {(1 : Nat)}</title><p>{"c"}</p></div>
+  replaces "a title with holes" titled titled (expected := false)
+  let live : Html Nat := <button onclick={(1 : Nat)} title={"t"}>{"a"}</button>
+  replaces "a static copy of a view" (Html.static live) live (expected := false)
   replaces "different text" (<p>{"a"}</p>) (<p>{"b"}</p>)
   replaces "different static text" (<p>a{"x"}</p>) (<p>b{"x"}</p>)
   replaces "a different element" (.elem "div" #[] #[]) (.elem "span" #[] #[])
@@ -283,10 +287,10 @@ structure Data where
 
 def dataScripts : IO Unit := do
   let data : Data := { count := 3, title := "é</script><b>x<!--" }
-  let holder ← rendered (jsonScript "lithe-data" data)
+  let holder ← rendered (Html.jsonScript "lithe-data" data : Html Nat).render
   checkEq "a script's content has no markup in it" (← holder.val.get "children" >>= (·.get "length") >>= fromJs) (1 : Nat)
   let read : Option Data ← readJsonScript? "lithe-data"
-  check "what `jsonScript` writes can be read" (read == some data)
+  check "what `Html.jsonScript` writes can be read" (read == some data)
   holder.remove
   let bad ← rendered "<script id=\"lithe-bad\" type=\"application/json\">{</script>"
   let result ← (readJsonScript? "lithe-bad" : IO (Option Nat)).toBaseIO

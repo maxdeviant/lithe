@@ -10,13 +10,13 @@ A site whose pages are files from a native Lean program, with two small interact
 
 **The client's name comes from Vite.** Vite builds the client first, under a name with its fingerprint, and the generator finds that name in Vite's manifest. The files in `public` are copied as they are.
 
-**Each island is an app of its own,** with its own root and state. The generator puts each view in an element for the client to find. It uses `Html.map` to give all of a page the same message type, as rendering leaves handlers out.
+**Each island is an app of its own,** with its own root and state. The generator puts each view in an element for the client to find, with `Html.static`, which drops its handlers, so that it fits in a page that has no messages.
 
 **A static page can't know what only the browser knows,** so an island has to hydrate with the state that the page was built from, or the page would be replaced. The theme switcher does that, and then finds out the theme with a command in `init`. A difference in an attribute in a hole is the exception, as it's corrected in place, which is how the search box gets to be shown: `filterApp` starts with `live` set.
 
 **The theme has to be applied before the page is shown,** which is too early for a module script, so a small inline script does that.
 
-**Markup doesn't cover the whole document.** It can't have `html`, `head`, or `body`, and can't have holes in `title` or `script`, so `Site.lean` builds those with `Html.elem`.
+**A whole page is markup too.** With `html` as its root, markup gives a `Document`, which can only be rendered, so an app can't be given something it can't take over.
 
 ## Running
 

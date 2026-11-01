@@ -214,8 +214,20 @@ end Render
 def Html.render (h : Html Msg) : String :=
   Render.renderTo "" false false h
 
-/-- Returns the HTML of an element with the ID `id` that holds `a` as JSON, for a client to read. -/
-def jsonScript [ToJson α] (id : String) (a : α) : String :=
-  s!"<script id=\"{Render.escapeAttr id}\" type=\"application/json\">{Json.encode a}</script>"
+/-- Returns the HTML for `d`, with a doctype. -/
+def Document.render (d : Document Msg) : String :=
+  s!"<!doctype html>{d.root.render}"
+
+/--
+Returns a `script` element with the ID `id` that holds `a` as JSON, for a client to read. This is safe
+for any value, as the JSON has no `<` in it, which is all that could end the element.
+-/
+def Html.jsonScript [ToJson α] (id : String) (a : α) : Html Msg :=
+  .elem "script" #[.value "id" (.str id), .value "type" (.str "application/json")]
+    #[.text (Json.encode a)]
+
+/-- Returns a `script` element that runs `code`, which has to be trusted, as nothing can escape it. -/
+def Html.inlineScript (code : String) : Html Msg :=
+  .elem "script" #[] #[.text code]
 
 end Lithe

@@ -54,7 +54,7 @@ Elements compile to a `Template`, which holds static HTML and the path to each h
 
 **Paths have to match what the HTML parser builds.** The macro therefore rejects anything the parser would restructure: `tr` directly in `table`, block elements in `p`, nested `a`, text in `table`, and so on. It also expands `<div />` to `<div></div>`, because the parser ignores `/>`, and adds a newline at the start of `pre`, where the parser drops one. If a path ever points to the wrong node, look for a parser rule that is missing from these checks.
 
-**Attribute checking is semi-strict.** Tags, attributes, and events are checked against generated tables, from `scripts/generate-html-data.js`. `data-*` and `aria-*` are always allowed, and custom elements (with a `-` in the tag name) accept anything.
+**Attribute checking is semi-strict.** Tags, attributes, and events are checked against generated tables, from `scripts/generate-html-data.js`. `data-*` and `aria-*` are always allowed, custom elements (with a `-` in the tag name) accept anything, and `property` is added for `meta`, as Open Graph needs it and the data leaves it out.
 
 **Whitespace** follows Svelte and JSX: whitespace containing a newline at either end of some text goes away, and other newlines collapse to a space. Whitespace with no newline, such as in `{a} {b}`, is kept. `pre`, `textarea`, `listing`, `script`, and `style` are left alone.
 
@@ -115,6 +115,14 @@ Known rough edges, which can't be fixed in the macro:
 
 **The macro records where each hole goes**, as byte offsets in `Template.sites`. Working it out again from the HTML would take a second parser that has to agree with the first.
 
+**A whole page is a `Document`.** `html`, `head`, and `body` would be dropped by the parser that reads templates, so they stay out of what an app can mount. Markup with `html` as its root gives a `Document` instead, which only has `render`, and the type is what keeps it away from `mount` and out of other markup. `html` has to hold `head` and then `body`, and `head` only what the HTML parser keeps there. It's one template like any other, so everything else in markup works in it.
+
+**A `title` with a hole is built directly.** A hole is a comment in a template, which would only be text in a `title`, so the whole element becomes a hole of its parent, with `Html.elem`. Its text then gets escaped rather than being HTML, so `&` has to go in a hole, it has no attributes, and its holes take anything with `ToString`, as it can't hold elements.
+
+**`script` has no holes,** even though the same approach would work, as it would look safe and not be. What's in a `script` runs, and breaking up `</` doesn't stop `<!--` from changing how the parser finds the end of the element. `Html.jsonScript` is for data, which is safe as its JSON has no `<`, and `Html.inlineScript` is for code, and says in its name that nothing is escaped.
+
+**`Html.static` removes handlers and actions,** so that a view for a client fits in a page without messages. An attribute hole has to stay, as holes match their sites by position, so it holds an attribute that renders to nothing.
+
 **Escaping happens at the boundary.** Static HTML is what the author wrote and goes through as is, so `&nbsp;` works, while anything from a hole is escaped. Text in raw text elements such as `script` can't be escaped, so `</` becomes `<\/` there, and names that `Html.elem` got at run time are dropped if they could add markup, as the DOM would reject them too.
 
 **Live properties** become what sets their initial state: `value` and `checked` are attributes, `value` on `textarea` is its content, and `value` on `select` adds `selected` to the first matching `option`, found by scanning the rendered content. `indeterminate` has no form in HTML, so it's dropped. A `select` whose value matches no option has none selected when mounted, but HTML can't say that, so the browser selects the first.
@@ -144,7 +152,7 @@ Known rough edges, which can't be fixed in the macro:
 
 **A view has to give the same result on both targets,** or the root is replaced. The results of `toString` on floats and the order of hash maps were the same in a small sample, and `USize` is the one known difference, at 32 bits in LeanScript.
 
-**The model travels as JSON in a `script` element.** `jsonScript` writes one on the server, and `readJsonScript?` reads it with `JSON.parse` and `FromJs`. A module that both sides import can't derive `FromJs`, as that needs JS, so the client uses `deriving instance`. An app builds its `init` from what that returns, so `App` has no part in this.
+**The model travels as JSON in a `script` element.** `Html.jsonScript` writes one on the server, and `readJsonScript?` reads it with `JSON.parse` and `FromJs`. A module that both sides import can't derive `FromJs`, as that needs JS, so the client uses `deriving instance`. An app builds its `init` from what that returns, so `App` has no part in this.
 
 ## JSON
 

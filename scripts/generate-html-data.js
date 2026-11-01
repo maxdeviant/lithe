@@ -21,6 +21,12 @@ const perElement = (table) =>
 // has certain attributes, so all of these belong in `foreignObject` if they are used at all.
 const notInSvg = ["audio", "canvas", "font", "iframe", "video"];
 
+// Open Graph's `property` comes from RDFa, which the standards data leaves out.
+const elementAttributes = {
+  ...htmlElementAttributes,
+  meta: [...htmlElementAttributes.meta, "property"],
+};
+
 const output = `module
 
 /-!
@@ -50,7 +56,7 @@ def eventAttributes : List String :=
 
 /-- The attributes that are specific to each HTML element. -/
 def elementAttributes : List (String × List String) := [
-${perElement(htmlElementAttributes)}
+${perElement(elementAttributes)}
 ]
 
 /-- The SVG element names, which are case-sensitive. -/
